@@ -40,17 +40,41 @@ function initializeTouristMarkers(tourists) {
 }
 
 // WebSocket connection for live updates
-const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsHost = window.location.host;
-const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
+function initializeDashboardWebSocket() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.host;
+    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
 
-ws.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    if (data.type === 'location_update') {
-        updateTouristOnMap(data);
-        updateTouristInTable(data);
-    }
-};
+    ws.onopen = function(event) {
+        console.log('WebSocket connection established for dashboard');
+    };
+
+    ws.onmessage = function(event) {
+        console.log('Dashboard WebSocket message received:', event.data);
+        const data = JSON.parse(event.data);
+        if (data.type === 'location_update') {
+            console.log('Updating tourist on dashboard:', data);
+            updateTouristOnMap(data);
+            updateTouristInTable(data);
+        }
+    };
+
+    ws.onerror = function(error) {
+        console.error('Dashboard WebSocket error:', error);
+    };
+
+    ws.onclose = function(event) {
+        console.log('Dashboard WebSocket connection closed:', event.code, event.reason);
+        // Attempt to reconnect after 3 seconds
+        setTimeout(() => {
+            console.log('Attempting to reconnect dashboard WebSocket...');
+            initializeDashboardWebSocket();
+        }, 3000);
+    };
+}
+
+// Initialize WebSocket connection
+initializeDashboardWebSocket();
 
 function updateTouristOnMap(data) {
     if (touristMarkers[data.tourist_id]) {

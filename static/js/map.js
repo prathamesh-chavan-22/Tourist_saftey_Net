@@ -1,5 +1,6 @@
 // Global variables (to be set by template)
 let tourist, geofence, currentUserRole, isAdmin;
+let ws; // Global WebSocket variable
 
 // Current position
 let currentLat, currentLon;
@@ -59,13 +60,40 @@ function initializeMap(touristData, geofenceData, userRole) {
 function initializeWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
-    const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
+    ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
+    
+    ws.onopen = function(event) {
+        console.log('WebSocket connection established for tourist map');
+    };
     
     ws.onmessage = function(event) {
+        console.log('WebSocket message received:', event.data);
         const data = JSON.parse(event.data);
         if (data.type === 'location_update' && data.tourist_id === tourist.id) {
+            console.log('Updating tourist status via WebSocket:', data);
             updateStatus(data);
+            
+            // Also update coordinates display and marker position
+            currentLat = data.latitude;
+            currentLon = data.longitude;
+            touristMarker.setLatLng([data.latitude, data.longitude]);
+            map.setView([data.latitude, data.longitude]);
+            document.getElementById('coordinates').textContent = 
+                `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
         }
+    };
+    
+    ws.onerror = function(error) {
+        console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = function(event) {
+        console.log('WebSocket connection closed:', event.code, event.reason);
+        // Attempt to reconnect after 3 seconds
+        setTimeout(() => {
+            console.log('Attempting to reconnect WebSocket...');
+            initializeWebSocket();
+        }, 3000);
     };
 }
 
