@@ -60,6 +60,8 @@ function initializeMap(touristData, geofenceData, userRole) {
 function initializeWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
+    
+    // Use cookie-based authentication (no token in URL for security)
     ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
     
     ws.onopen = function(event) {

@@ -133,32 +133,93 @@ GEOFENCE_CENTER = {"lat": 27.1751, "lon": 78.0421}
 GEOFENCE_RADIUS = 500
 
 # WebSocket connection manager
+class AuthenticatedConnection:
+    """Represents an authenticated WebSocket connection with user information"""
+    def __init__(self, websocket: WebSocket, user: User, tourist: Optional[Tourist] = None):
+        self.websocket = websocket
+        self.user = user
+        self.tourist = tourist
+
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: List[AuthenticatedConnection] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user: User, tourist: Optional[Tourist] = None):
+        """Connect an authenticated user with WebSocket"""
         await websocket.accept()
-        self.active_connections.append(websocket)
+        connection = AuthenticatedConnection(websocket, user, tourist)
+        self.active_connections.append(connection)
+        return connection
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        """Disconnect WebSocket and remove from active connections"""
+        self.active_connections = [
+            conn for conn in self.active_connections 
+            if conn.websocket != websocket
+        ]
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
+        """Send message to specific WebSocket"""
         await websocket.send_text(message)
 
+    async def broadcast_to_admins(self, message: str):
+        """Broadcast message only to admin users"""
+        connections_to_remove = []
+        
+        for connection in self.active_connections.copy():
+            if str(connection.user.role) == "admin":
+                try:
+                    await connection.websocket.send_text(message)
+                except Exception as e:
+                    connections_to_remove.append(connection)
+        
+        # Remove disconnected connections
+        for connection in connections_to_remove:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
+
+    async def send_to_tourist(self, tourist_id: int, message: str):
+        """Send message to specific tourist by their tourist ID"""
+        connections_to_remove = []
+        
+        for connection in self.active_connections.copy():
+            # Check if this connection belongs to the target tourist
+            if (connection.tourist is not None and int(connection.tourist.id) == tourist_id):
+                try:
+                    await connection.websocket.send_text(message)
+                except Exception as e:
+                    connections_to_remove.append(connection)
+        
+        # Remove disconnected connections
+        for connection in connections_to_remove:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
+
+    async def broadcast_location_update(self, tourist_id: int, location_data: dict):
+        """
+        Broadcast location update with role-based filtering:
+        - Admin users: receive all tourist location updates
+        - Tourist users: only receive their own location updates
+        """
+        message = json.dumps(location_data)
+        
+        # Send to all admin users
+        await self.broadcast_to_admins(message)
+        
+        # Send to the specific tourist whose location was updated
+        await self.send_to_tourist(tourist_id, message)
+
     async def broadcast(self, message: str):
-        # Create a copy of connections to safely iterate and remove
+        """Legacy broadcast method - sends to all connections (deprecated for security)"""
         connections_to_remove = []
         
         for connection in self.active_connections.copy():
             try:
-                await connection.send_text(message)
+                await connection.websocket.send_text(message)
             except Exception as e:
-                # Mark connection for removal
                 connections_to_remove.append(connection)
         
-        # Remove disconnected connections after iteration
+        # Remove disconnected connections
         for connection in connections_to_remove:
             if connection in self.active_connections:
                 self.active_connections.remove(connection)
@@ -432,7 +493,7 @@ async def update_location(
     tourist.status = new_status  # type: ignore
     await db.commit()
     
-    # Broadcast location update via WebSocket using stored values
+    # Broadcast location update via WebSocket using stored values with role-based filtering
     update_message = {
         "type": "location_update",
         "tourist_id": tourist_id,
@@ -442,7 +503,7 @@ async def update_location(
         "status": new_status,
         "inside_fence": inside_fence
     }
-    await manager.broadcast(json.dumps(update_message))
+    await manager.broadcast_location_update(tourist_id, update_message)
     
     return {"status": new_status, "inside_fence": inside_fence}
 
@@ -513,16 +574,64 @@ async def get_map_data(
     }
 
 @app.websocket("/ws/location")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for live location updates"""
-    await manager.connect(websocket)
+async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
+    """WebSocket endpoint for live location updates with authentication"""
     try:
-        while True:
-            data = await websocket.receive_text()
-            # Echo received data back to all connected clients
-            await manager.broadcast(data)
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        # Origin validation to prevent Cross-Site WebSocket Hijacking (CSWSH)
+        origin = websocket.headers.get("origin")
+        allowed_origins = [
+            f"http://{websocket.headers.get('host')}",
+            f"https://{websocket.headers.get('host')}",
+            "http://localhost:5000",
+            "https://localhost:5000"
+        ]
+        
+        if origin and origin not in allowed_origins:
+            await websocket.close(code=1008, reason="Origin not allowed")
+            return
+        
+        # Authenticate user using HttpOnly cookie
+        user = None
+        access_token = websocket.cookies.get("access_token")
+        
+        if access_token:
+            from auth import verify_token
+            try:
+                payload = verify_token(access_token)
+                email = payload.get("sub")
+                if email:
+                    result = await db.execute(select(User).filter(User.email == email))
+                    user = result.scalar_one_or_none()
+            except HTTPException:
+                pass
+        
+        if not user:
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+        
+        # Get tourist data if user is a tourist
+        tourist = None
+        if str(user.role) == "tourist":
+            result = await db.execute(select(Tourist).filter(Tourist.user_id == user.id))
+            tourist = result.scalar_one_or_none()
+        
+        # Connect with authenticated user
+        await manager.connect(websocket, user, tourist)
+        
+        try:
+            while True:
+                # Keep connection alive - clients don't need to send data
+                data = await websocket.receive_text()
+                # Optional: Handle any client messages here if needed
+        except WebSocketDisconnect:
+            manager.disconnect(websocket)
+    except Exception as e:
+        # Log error and close connection
+        print(f"WebSocket error: {e}")
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except:
+            pass
 
 # Authentication Web Pages
 @app.get("/login", response_class=HTMLResponse)

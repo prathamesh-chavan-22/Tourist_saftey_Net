@@ -43,6 +43,8 @@ function initializeTouristMarkers(tourists) {
 function initializeDashboardWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host;
+    
+    // Use cookie-based authentication (no token in URL for security)
     const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
 
     ws.onopen = function(event) {
