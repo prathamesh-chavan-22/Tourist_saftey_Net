@@ -271,7 +271,9 @@ async def login_form(
         value=access_token,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
-        secure=False  # Set to True in production with HTTPS
+        secure=False,  # Set to True in production with HTTPS
+        path="/",
+        samesite="lax"
     )
     return response
 
@@ -294,53 +296,65 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
     }
 
 @app.post("/register")
-async def register_tourist(tourist_data: TouristRegistration, db: Session = Depends(get_db)):
+async def register_tourist(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    location_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
     """Register a new tourist with both user account and tourist profile"""
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == tourist_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+    try:
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == email).first()
+        if existing_user:
+            return templates.TemplateResponse("register.html", {
+                "request": request,
+                "error": "Email already registered",
+                "tourist_places": INDIAN_TOURIST_PLACES
+            })
+        
+        # Create user account
+        hashed_password = User.get_password_hash(password)
+        new_user = User(
+            email=email,
+            hashed_password=hashed_password,
+            full_name=name,
+            role="tourist"
         )
-    
-    # Create user account
-    hashed_password = User.get_password_hash(tourist_data.password)
-    new_user = User(
-        email=tourist_data.email,
-        hashed_password=hashed_password,
-        full_name=tourist_data.name,
-        role="tourist"
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Create tourist profile
-    blockchain_id = Tourist.generate_blockchain_id(tourist_data.name)
-    tourist_place = get_tourist_place_by_id(tourist_data.location_id)
-    
-    new_tourist = Tourist(
-        user_id=new_user.id,
-        name=tourist_data.name,
-        blockchain_id=blockchain_id,
-        location_id=tourist_data.location_id,
-        last_lat=tourist_place["lat"],
-        last_lon=tourist_place["lon"]
-    )
-    
-    db.add(new_tourist)
-    db.commit()
-    db.refresh(new_tourist)
-    
-    return {
-        "id": new_tourist.id,
-        "name": new_tourist.name,
-        "blockchain_id": new_tourist.blockchain_id,
-        "status": new_tourist.status,
-        "user_id": new_user.id
-    }
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        # Create tourist profile
+        blockchain_id = Tourist.generate_blockchain_id(name)
+        tourist_place = get_tourist_place_by_id(location_id)
+        
+        new_tourist = Tourist(
+            user_id=new_user.id,
+            name=name,
+            blockchain_id=blockchain_id,
+            location_id=location_id,
+            last_lat=tourist_place["lat"],
+            last_lon=tourist_place["lon"]
+        )
+        
+        db.add(new_tourist)
+        db.commit()
+        db.refresh(new_tourist)
+        
+        # Redirect to login page with success message
+        return RedirectResponse(url="/login?message=Registration successful! Please login.", status_code=status.HTTP_302_FOUND)
+        
+    except Exception as e:
+        # Return to registration form with error message
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "error": f"Registration failed: {str(e)}",
+            "tourist_places": INDIAN_TOURIST_PLACES
+        })
 
 @app.post("/update_location")
 async def update_location(
@@ -475,11 +489,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Authentication Web Pages
 @app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: Optional[str] = None):
+async def login_page(request: Request, error: Optional[str] = None, message: Optional[str] = None):
     """Login page for both admin and tourist users"""
     return templates.TemplateResponse("login.html", {
         "request": request,
-        "error": error
+        "error": error,
+        "message": message
     })
 
 @app.get("/register-form", response_class=HTMLResponse)
@@ -554,6 +569,7 @@ async def dashboard_page(request: Request, db: Session = Depends(get_db)):
     """Authority dashboard page"""
     # Try to get current user, redirect to login if not authenticated
     from auth import get_user_from_cookie_token
+    
     current_user = get_user_from_cookie_token(
         request.cookies.get("access_token"), db
     )
