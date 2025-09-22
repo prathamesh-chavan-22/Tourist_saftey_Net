@@ -3,7 +3,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 from typing import List, Optional
 import json
@@ -24,62 +25,65 @@ app = FastAPI(title="Smart Tourist Safety Monitoring System")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Create database tables on startup
-create_tables()
+# Create database tables on startup - will be called async in startup event
 
 # Create demo users on startup
-def create_demo_users():
+async def create_demo_users():
     """Create demo admin and tourist users"""
-    from models import SessionLocal
-    db = SessionLocal()
-    try:
-        # Check if demo admin exists
-        admin_exists = db.query(User).filter(User.email == "admin@demo.com").first()
-        if not admin_exists:
-            admin_user = User(
-                email="admin@demo.com",
-                hashed_password=User.get_password_hash("admin123"),
-                full_name="Admin User",
-                role="admin"
-            )
-            db.add(admin_user)
+    from models import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            # Check if demo admin exists
+            result = await db.execute(select(User).filter(User.email == "admin@demo.com"))
+            admin_exists = result.scalar_one_or_none()
+            if not admin_exists:
+                admin_user = User(
+                    email="admin@demo.com",
+                    hashed_password=User.get_password_hash("admin123"),
+                    full_name="Admin User",
+                    role="admin"
+                )
+                db.add(admin_user)
+                
+            # Check if demo tourist exists  
+            result = await db.execute(select(User).filter(User.email == "tourist@demo.com"))
+            tourist_exists = result.scalar_one_or_none()
+            if not tourist_exists:
+                tourist_user = User(
+                    email="tourist@demo.com",
+                    hashed_password=User.get_password_hash("tourist123"),
+                    full_name="Demo Tourist",
+                    role="tourist"
+                )
+                db.add(tourist_user)
+                await db.commit()
+                await db.refresh(tourist_user)
+                
+                # Create tourist profile for demo tourist  
+                blockchain_id = Tourist.generate_blockchain_id("Demo Tourist")
+                tourist_place = {"lat": 27.1751, "lon": 78.0421}  # Default Taj Mahal coordinates
+                
+                demo_tourist = Tourist(
+                    user_id=tourist_user.id,
+                    name="Demo Tourist",
+                    blockchain_id=blockchain_id,
+                    location_id=1,
+                    last_lat=tourist_place["lat"],
+                    last_lon=tourist_place["lon"]
+                )
+                db.add(demo_tourist)
             
-        # Check if demo tourist exists  
-        tourist_exists = db.query(User).filter(User.email == "tourist@demo.com").first()
-        if not tourist_exists:
-            tourist_user = User(
-                email="tourist@demo.com",
-                hashed_password=User.get_password_hash("tourist123"),
-                full_name="Demo Tourist",
-                role="tourist"
-            )
-            db.add(tourist_user)
-            db.commit()
-            db.refresh(tourist_user)
-            
-            # Create tourist profile for demo tourist  
-            blockchain_id = Tourist.generate_blockchain_id("Demo Tourist")
-            tourist_place = {"lat": 27.1751, "lon": 78.0421}  # Default Taj Mahal coordinates
-            
-            demo_tourist = Tourist(
-                user_id=tourist_user.id,
-                name="Demo Tourist",
-                blockchain_id=blockchain_id,
-                location_id=1,
-                last_lat=tourist_place["lat"],
-                last_lon=tourist_place["lon"]
-            )
-            db.add(demo_tourist)
-        
-        db.commit()
-    except Exception as e:
-        print(f"Error creating demo users: {e}")
-        db.rollback()
-    finally:
-        db.close()
+            await db.commit()
+        except Exception as e:
+            print(f"Error creating demo users: {e}")
+            await db.rollback()
 
-# Create demo users
-create_demo_users()
+# Startup event to create tables and demo users
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    await create_tables()
+    await create_demo_users()
 
 # Pydantic models for request validation
 class TouristRegistration(BaseModel):
@@ -144,11 +148,19 @@ class ConnectionManager:
         await websocket.send_text(message)
 
     async def broadcast(self, message: str):
-        for connection in self.active_connections:
+        # Create a copy of connections to safely iterate and remove
+        connections_to_remove = []
+        
+        for connection in self.active_connections.copy():
             try:
                 await connection.send_text(message)
-            except:
-                # Remove disconnected connections
+            except Exception as e:
+                # Mark connection for removal
+                connections_to_remove.append(connection)
+        
+        # Remove disconnected connections after iteration
+        for connection in connections_to_remove:
+            if connection in self.active_connections:
                 self.active_connections.remove(connection)
 
 manager = ConnectionManager()
@@ -186,14 +198,23 @@ def get_tourist_place_by_id(location_id: int):
 
 # Authentication endpoints
 @app.post("/auth/register", response_model=Token)
-async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
+async def register_user(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     """Register a new user (admin or tourist)"""
     # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    result = await db.execute(select(User).filter(User.email == user_data.email))
+    existing_user = result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
+        )
+    
+    # SECURITY: Validate role against allowlist - only allow "admin" and "tourist"
+    allowed_roles = {"admin", "tourist"}
+    if user_data.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role. Only 'admin' and 'tourist' roles are allowed."
         )
     
     # Create new user
@@ -206,8 +227,8 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     )
     
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
     
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -219,9 +240,9 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/auth/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     """Login user and return JWT token"""
-    user = authenticate_user(form_data.username, form_data.password, db)
+    user = await authenticate_user(form_data.username, form_data.password, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -242,10 +263,10 @@ async def login_form(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Form-based login for web interface"""
-    user = authenticate_user(email, password, db)
+    user = await authenticate_user(email, password, db)
     if not user:
         # Redirect back to login with error
         return RedirectResponse(
@@ -302,12 +323,13 @@ async def register_tourist(
     email: str = Form(...),
     password: str = Form(...),
     location_id: int = Form(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Register a new tourist with both user account and tourist profile"""
     try:
         # Check if user already exists
-        existing_user = db.query(User).filter(User.email == email).first()
+        result = await db.execute(select(User).filter(User.email == email))
+        existing_user = result.scalar_one_or_none()
         if existing_user:
             return templates.TemplateResponse("register.html", {
                 "request": request,
@@ -325,8 +347,8 @@ async def register_tourist(
         )
         
         db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
+        await db.commit()
+        await db.refresh(new_user)
         
         # Create tourist profile
         blockchain_id = Tourist.generate_blockchain_id(name)
@@ -342,8 +364,8 @@ async def register_tourist(
         )
         
         db.add(new_tourist)
-        db.commit()
-        db.refresh(new_tourist)
+        await db.commit()
+        await db.refresh(new_tourist)
         
         # Redirect to login page with success message
         return RedirectResponse(url="/login?message=Registration successful! Please login.", status_code=status.HTTP_302_FOUND)
@@ -360,7 +382,7 @@ async def register_tourist(
 async def update_location(
     location_data: LocationUpdate, 
     current_user: User = Depends(get_current_active_user_flexible),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Update tourist location and check geofence status"""
     # Validate coordinates
@@ -369,16 +391,29 @@ async def update_location(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    tourist = db.query(Tourist).filter(Tourist.id == location_data.tourist_id).first()
+    result = await db.execute(select(Tourist).filter(Tourist.id == location_data.tourist_id))
+    tourist = result.scalar_one_or_none()
     if not tourist:
         raise HTTPException(status_code=404, detail="Tourist not found")
     
-    # Check if user has permission to update this tourist's location
-    if str(current_user.role) == "tourist" and int(str(tourist.user_id)) != current_user.id:
+    # SECURITY: Default-deny authorization - only allow role="tourist" to update their own positions
+    # All other roles are explicitly denied
+    if str(current_user.role) != "tourist":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own location"
+            detail="Access denied: Only tourists can update location positions"
         )
+    
+    # Tourist users can only update their own location
+    if int(str(tourist.user_id)) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You can only update your own location"
+        )
+    
+    # Store tourist data before session operations to avoid detachment issues
+    tourist_id = tourist.id
+    tourist_name = tourist.name
     
     # Update location
     tourist.last_lat = location_data.latitude  # type: ignore
@@ -391,17 +426,17 @@ async def update_location(
     # Log incident if status changed to Critical
     current_status = str(tourist.status)
     if current_status != "Critical" and new_status == "Critical":
-        incident = Incident(tourist_id=tourist.id, severity="Critical")
+        incident = Incident(tourist_id=tourist_id, severity="Critical")
         db.add(incident)
     
     tourist.status = new_status  # type: ignore
-    db.commit()
+    await db.commit()
     
-    # Broadcast location update via WebSocket
+    # Broadcast location update via WebSocket using stored values
     update_message = {
         "type": "location_update",
-        "tourist_id": tourist.id,
-        "name": tourist.name,
+        "tourist_id": tourist_id,
+        "name": tourist_name,
         "latitude": location_data.latitude,
         "longitude": location_data.longitude,
         "status": new_status,
@@ -414,10 +449,11 @@ async def update_location(
 @app.get("/dashboard")
 async def get_dashboard_data(
     current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get all tourists data for dashboard"""
-    tourists = db.query(Tourist).all()
+    result = await db.execute(select(Tourist))
+    tourists = result.scalars().all()
     return [
         {
             "id": tourist.id,
@@ -441,10 +477,11 @@ async def get_tourist_places():
 async def get_map_data(
     tourist_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get initial map data for a specific tourist"""
-    tourist = db.query(Tourist).filter(Tourist.id == tourist_id).first()
+    result = await db.execute(select(Tourist).filter(Tourist.id == tourist_id))
+    tourist = result.scalar_one_or_none()
     if not tourist:
         raise HTTPException(status_code=404, detail="Tourist not found")
     
@@ -507,11 +544,11 @@ async def register_page(request: Request, error: Optional[str] = None):
     })
 
 @app.get("/tourist-dashboard", response_class=HTMLResponse)
-async def tourist_dashboard_page(request: Request, db: Session = Depends(get_db)):
+async def tourist_dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Tourist dashboard page - shows only their own data"""
     # Try to get current user, redirect to login if not authenticated
     from auth import get_user_from_cookie_token
-    current_user = get_user_from_cookie_token(
+    current_user = await get_user_from_cookie_token(
         request.cookies.get("access_token"), db
     )
     if not current_user:
@@ -521,7 +558,8 @@ async def tourist_dashboard_page(request: Request, db: Session = Depends(get_db)
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     
     # Get tourist data for this user
-    tourist = db.query(Tourist).filter(Tourist.user_id == current_user.id).first()
+    result = await db.execute(select(Tourist).filter(Tourist.user_id == current_user.id))
+    tourist = result.scalar_one_or_none()
     if not tourist:
         # Create tourist profile if it doesn't exist
         tourist_place = get_tourist_place_by_id(1)  # Default to Taj Mahal
@@ -537,8 +575,8 @@ async def tourist_dashboard_page(request: Request, db: Session = Depends(get_db)
         )
         
         db.add(tourist)
-        db.commit()
-        db.refresh(tourist)
+        await db.commit()
+        await db.refresh(tourist)
     
     tourist_place = get_tourist_place_by_id(int(str(tourist.location_id)))
     tourist_data = {
@@ -565,12 +603,12 @@ async def tourist_dashboard_page(request: Request, db: Session = Depends(get_db)
     })
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard_page(request: Request, db: Session = Depends(get_db)):
+async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Authority dashboard page"""
     # Try to get current user, redirect to login if not authenticated
     from auth import get_user_from_cookie_token
     
-    current_user = get_user_from_cookie_token(
+    current_user = await get_user_from_cookie_token(
         request.cookies.get("access_token"), db
     )
     if not current_user:
@@ -580,7 +618,8 @@ async def dashboard_page(request: Request, db: Session = Depends(get_db)):
     if str(current_user.role) != "admin":
         return RedirectResponse(url="/tourist-dashboard", status_code=status.HTTP_302_FOUND)
     
-    tourists = db.query(Tourist).all()
+    result = await db.execute(select(Tourist))
+    tourists = result.scalars().all()
     # Enrich tourists with location names
     tourists_data = []
     for tourist in tourists:
@@ -606,18 +645,19 @@ async def dashboard_page(request: Request, db: Session = Depends(get_db)):
 async def tourist_map_page(
     tourist_id: int, 
     request: Request,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Tourist map page with arrow key controls"""
     # Try to get current user, redirect to login if not authenticated
     from auth import get_user_from_cookie_token
-    current_user = get_user_from_cookie_token(
+    current_user = await get_user_from_cookie_token(
         request.cookies.get("access_token"), db
     )
     if not current_user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     
-    tourist = db.query(Tourist).filter(Tourist.id == tourist_id).first()
+    result = await db.execute(select(Tourist).filter(Tourist.id == tourist_id))
+    tourist = result.scalar_one_or_none()
     if not tourist:
         raise HTTPException(status_code=404, detail="Tourist not found")
     
@@ -634,6 +674,7 @@ async def tourist_map_page(
     return templates.TemplateResponse("map.html", {
         "request": request,
         "tourist": tourist,
+        "current_user": current_user,  # Pass current user to template
         "geofence": {
             "center_lat": tourist_place["lat"],
             "center_lon": tourist_place["lon"],

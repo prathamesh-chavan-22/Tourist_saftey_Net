@@ -130,7 +130,14 @@
     <div class="header">
         <h1>🇮🇳 Tourist Map - {{ tourist.name }}</h1>
         <p><strong>Location:</strong> {{ geofence.name }} | <strong>Safe Zone:</strong> {{ geofence.radius }}m radius</p>
+        {% if current_user.role == "admin" %}
+        <div style="background-color: #ffc107; color: #212529; padding: 10px; border-radius: 4px; margin: 10px 0; font-weight: bold;">
+            👁️ <strong>Admin View - Read Only</strong> | You are viewing this tourist's location without control access
+        </div>
+        <p>Admin view: You can monitor the tourist's status and location but cannot control movement</p>
+        {% else %}
         <p>Use arrow keys (↑↓←→) to move around and monitor your safety status in real-time</p>
+        {% endif %}
         <a href="/" class="dashboard-link">← Back to Dashboard</a>
     </div>
 
@@ -163,6 +170,7 @@
         <div id="map"></div>
     </div>
 
+    {% if current_user.role != "admin" %}
     <div class="controls-panel">
         <h3>Movement Controls</h3>
         <p>Use the arrow keys on your keyboard or click the buttons below to move:</p>
@@ -179,6 +187,7 @@
             <small><strong>SIH 2024 PS-2:</strong> Smart Tourist Safety Monitoring System</small>
         </div>
     </div>
+    {% endif %}
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -190,6 +199,10 @@
             lon: {{ tourist.last_lon }},
             status: "{{ tourist.status }}"
         };
+        
+        // Current user role
+        const currentUserRole = "{{ current_user.role }}";
+        const isAdmin = currentUserRole === "admin";
 
         const geofence = {
             centerLat: {{ geofence.center_lat }},
@@ -274,10 +287,33 @@
                 if (response.ok) {
                     const result = await response.json();
                     updateStatusDisplay(result.status, result.inside_fence);
+                } else if (response.status === 403) {
+                    // Handle 403 Forbidden - Admin trying to update location
+                    showAdminErrorMessage();
+                } else {
+                    console.error('Failed to update location:', response.status, response.statusText);
                 }
             } catch (error) {
                 console.error('Error updating location:', error);
             }
+        }
+        
+        function showAdminErrorMessage() {
+            // Create or show error message for admin users
+            let errorDiv = document.getElementById('adminError');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.id = 'adminError';
+                errorDiv.className = 'alert alert-warning';
+                errorDiv.innerHTML = '⚠️ <strong>Access Denied:</strong> Admin users cannot control tourist movement.';
+                document.getElementById('alertContainer').appendChild(errorDiv);
+            }
+            errorDiv.style.display = 'block';
+            
+            // Hide error after 5 seconds
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
         }
 
         function updateStatus(data) {
@@ -303,40 +339,44 @@
             }
         }
 
-        // Keyboard controls
-        document.addEventListener('keydown', function(event) {
-            switch(event.key) {
-                case 'ArrowUp':
-                    event.preventDefault();
-                    moveUp();
-                    break;
-                case 'ArrowDown':
-                    event.preventDefault();
-                    moveDown();
-                    break;
-                case 'ArrowLeft':
-                    event.preventDefault();
-                    moveLeft();
-                    break;
-                case 'ArrowRight':
-                    event.preventDefault();
-                    moveRight();
-                    break;
-            }
-        });
-
-        // Button controls
-        document.querySelectorAll('.arrow-key').forEach(button => {
-            button.addEventListener('click', function() {
-                const direction = this.getAttribute('data-direction');
-                switch(direction) {
-                    case 'up': moveUp(); break;
-                    case 'down': moveDown(); break;
-                    case 'left': moveLeft(); break;
-                    case 'right': moveRight(); break;
+        // Keyboard controls (only for non-admin users)
+        if (!isAdmin) {
+            document.addEventListener('keydown', function(event) {
+                switch(event.key) {
+                    case 'ArrowUp':
+                        event.preventDefault();
+                        moveUp();
+                        break;
+                    case 'ArrowDown':
+                        event.preventDefault();
+                        moveDown();
+                        break;
+                    case 'ArrowLeft':
+                        event.preventDefault();
+                        moveLeft();
+                        break;
+                    case 'ArrowRight':
+                        event.preventDefault();
+                        moveRight();
+                        break;
                 }
             });
-        });
+        }
+
+        // Button controls (only for non-admin users)
+        if (!isAdmin) {
+            document.querySelectorAll('.arrow-key').forEach(button => {
+                button.addEventListener('click', function() {
+                    const direction = this.getAttribute('data-direction');
+                    switch(direction) {
+                        case 'up': moveUp(); break;
+                        case 'down': moveDown(); break;
+                        case 'left': moveLeft(); break;
+                        case 'right': moveRight(); break;
+                    }
+                });
+            });
+        }
 
         // Initialize status display
         const insideFence = tourist.status === 'Safe';

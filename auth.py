@@ -3,7 +3,8 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models import User, get_db
 
 # JWT Configuration
@@ -43,9 +44,9 @@ def verify_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get current user from JWT token"""
     token = credentials.credentials
@@ -58,7 +59,8 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).filter(User.email == email))
+    user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -67,9 +69,9 @@ def get_current_user(
         )
     return user
 
-def get_current_user_from_cookie(
+async def get_current_user_from_cookie(
     access_token: Optional[str] = Cookie(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get current user from cookie for template authentication"""
     if not access_token:
@@ -86,7 +88,8 @@ def get_current_user_from_cookie(
             detail="Invalid token: missing email"
         )
     
-    user = db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).filter(User.email == email))
+    user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -94,13 +97,13 @@ def get_current_user_from_cookie(
         )
     return user
 
-def get_current_active_user(current_user: User = Depends(get_current_user)):
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
     """Get current active user"""
     if current_user.is_active is False:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-def require_admin(current_user: User = Depends(get_current_active_user)):
+async def require_admin(current_user: User = Depends(get_current_active_user)):
     """Require admin role"""
     if str(current_user.role) != "admin":
         raise HTTPException(
@@ -109,7 +112,7 @@ def require_admin(current_user: User = Depends(get_current_active_user)):
         )
     return current_user
 
-def require_tourist(current_user: User = Depends(get_current_active_user)):
+async def require_tourist(current_user: User = Depends(get_current_active_user)):
     """Require tourist role"""
     if str(current_user.role) != "tourist":
         raise HTTPException(
@@ -118,7 +121,7 @@ def require_tourist(current_user: User = Depends(get_current_active_user)):
         )
     return current_user
 
-def get_user_from_cookie_token(access_token: Optional[str], db: Session) -> Optional[User]:
+async def get_user_from_cookie_token(access_token: Optional[str], db: AsyncSession) -> Optional[User]:
     """Manually get user from cookie token - for use in template endpoints"""
     if not access_token:
         return None
@@ -129,15 +132,16 @@ def get_user_from_cookie_token(access_token: Optional[str], db: Session) -> Opti
         if email is None or not isinstance(email, str):
             return None
         
-        user = db.query(User).filter(User.email == email).first()
+        result = await db.execute(select(User).filter(User.email == email))
+        user = result.scalar_one_or_none()
         return user
     except HTTPException:
         return None
 
-def get_current_user_flexible(
+async def get_current_user_flexible(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
     access_token: Optional[str] = Cookie(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Flexible authentication that tries Bearer token first, then falls back to cookie authentication.
@@ -151,7 +155,8 @@ def get_current_user_flexible(
             payload = verify_token(credentials.credentials)
             email = payload.get("sub")
             if email and isinstance(email, str):
-                user = db.query(User).filter(User.email == email).first()
+                result = await db.execute(select(User).filter(User.email == email))
+                user = result.scalar_one_or_none()
         except HTTPException:
             # Bearer token authentication failed, will try cookie next
             pass
@@ -162,7 +167,8 @@ def get_current_user_flexible(
             payload = verify_token(access_token)
             email = payload.get("sub")
             if email and isinstance(email, str):
-                user = db.query(User).filter(User.email == email).first()
+                result = await db.execute(select(User).filter(User.email == email))
+                user = result.scalar_one_or_none()
         except HTTPException:
             # Cookie authentication also failed
             pass
@@ -177,15 +183,16 @@ def get_current_user_flexible(
     
     return user
 
-def get_current_active_user_flexible(current_user: User = Depends(get_current_user_flexible)):
+async def get_current_active_user_flexible(current_user: User = Depends(get_current_user_flexible)):
     """Get current active user with flexible authentication (Bearer token or cookie)"""
     if current_user.is_active is False:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-def authenticate_user(email: str, password: str, db: Session) -> Optional[User]:
+async def authenticate_user(email: str, password: str, db: AsyncSession) -> Optional[User]:
     """Authenticate user with email and password"""
-    user = db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).filter(User.email == email))
+    user = result.scalar_one_or_none()
     if not user:
         return None
     if not user.verify_password(password):
