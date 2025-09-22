@@ -252,6 +252,7 @@
             <div class="user-type">
                 <button type="button" id="touristBtn" class="active">Tourist Login</button>
                 <button type="button" id="adminBtn">Admin Login</button>
+                <button type="button" id="guideBtn">Guide Login</button>
             </div>
 
             <div class="form-group">
@@ -269,13 +270,15 @@
 
         <div class="links">
             <a href="/register-form">Create Tourist Account</a>
+            <a href="/register-guide-form">Register as Guide</a>
         </div>
 
         <div class="demo-section">
             <h4>Demo Credentials</h4>
             <div class="demo-credentials">
                 <strong>Admin:</strong> admin@demo.com / admin123<br>
-                <strong>Tourist:</strong> tourist@demo.com / tourist123
+                <strong>Tourist:</strong> tourist@demo.com / tourist123<br>
+                <strong>Guide:</strong> guide@demo.com / guide123
             </div>
         </div>
 
@@ -347,18 +350,28 @@
     <script>
         const touristBtn = document.getElementById('touristBtn');
         const adminBtn = document.getElementById('adminBtn');
+        const guideBtn = document.getElementById('guideBtn');
         const emailInput = document.getElementById('email');
 
         touristBtn.addEventListener('click', function() {
             touristBtn.classList.add('active');
             adminBtn.classList.remove('active');
+            guideBtn.classList.remove('active');
             emailInput.placeholder = 'tourist@example.com';
         });
 
         adminBtn.addEventListener('click', function() {
             adminBtn.classList.add('active');
             touristBtn.classList.remove('active');
+            guideBtn.classList.remove('active');
             emailInput.placeholder = 'admin@example.com';
+        });
+
+        guideBtn.addEventListener('click', function() {
+            guideBtn.classList.add('active');
+            touristBtn.classList.remove('active');
+            adminBtn.classList.remove('active');
+            emailInput.placeholder = 'guide@example.com';
         });
 
         // Auto-fill demo credentials
@@ -370,6 +383,11 @@
         adminBtn.addEventListener('dblclick', function() {
             document.getElementById('email').value = 'admin@demo.com';
             document.getElementById('password').value = 'admin123';
+        });
+
+        guideBtn.addEventListener('dblclick', function() {
+            document.getElementById('email').value = 'guide@demo.com';
+            document.getElementById('password').value = 'guide123';
         });
 
         // Modal functions

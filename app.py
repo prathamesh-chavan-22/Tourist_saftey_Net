@@ -11,11 +11,11 @@ import json
 import math
 from datetime import datetime, timedelta
 
-from models import Tourist, Incident, User, get_db, create_tables
+from models import Tourist, Incident, User, TouristGuide, get_db, create_tables
 from auth import (
     authenticate_user, create_access_token, get_current_user, 
-    get_current_active_user, require_admin, require_tourist,
-    get_current_user_from_cookie, get_current_active_user_flexible,
+    get_current_active_user, require_admin, require_tourist, require_tourist_guide,
+    require_admin_or_guide, get_current_user_from_cookie, get_current_active_user_flexible,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
@@ -44,6 +44,8 @@ async def create_demo_users():
                     role="admin"
                 )
                 db.add(admin_user)
+                await db.commit()
+                await db.refresh(admin_user)
                 
             # Check if demo tourist exists  
             result = await db.execute(select(User).filter(User.email == "tourist@demo.com"))
@@ -72,6 +74,31 @@ async def create_demo_users():
                     last_lon=tourist_place["lon"]
                 )
                 db.add(demo_tourist)
+            
+            # Check if demo tourist guide exists
+            result = await db.execute(select(User).filter(User.email == "guide@demo.com"))
+            guide_exists = result.scalar_one_or_none()
+            if not guide_exists:
+                guide_user = User(
+                    email="guide@demo.com",
+                    hashed_password=User.get_password_hash("guide123"),
+                    full_name="Demo Guide",
+                    role="tourist_guide"
+                )
+                db.add(guide_user)
+                await db.commit()
+                await db.refresh(guide_user)
+                
+                # Create guide profile for demo guide
+                guide_id = TouristGuide.generate_guide_id("Demo Guide")
+                
+                demo_guide = TouristGuide(
+                    user_id=guide_user.id,
+                    name="Demo Guide",
+                    guide_id=guide_id,
+                    specializations="Historical Sites, Museums, Cultural Heritage"
+                )
+                db.add(demo_guide)
             
             await db.commit()
         except Exception as e:
@@ -178,6 +205,22 @@ class ConnectionManager:
             if connection in self.active_connections:
                 self.active_connections.remove(connection)
 
+    async def broadcast_to_admins_and_guides(self, message: str):
+        """Broadcast message to admin users and tourist guides"""
+        connections_to_remove = []
+        
+        for connection in self.active_connections.copy():
+            if str(connection.user.role) in ["admin", "tourist_guide"]:
+                try:
+                    await connection.websocket.send_text(message)
+                except Exception as e:
+                    connections_to_remove.append(connection)
+        
+        # Remove disconnected connections
+        for connection in connections_to_remove:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
+
     async def send_to_tourist(self, tourist_id: int, message: str):
         """Send message to specific tourist by their tourist ID"""
         connections_to_remove = []
@@ -270,12 +313,12 @@ async def register_user(user_data: UserCreate, db: AsyncSession = Depends(get_db
             detail="Email already registered"
         )
     
-    # SECURITY: Validate role against allowlist - only allow "admin" and "tourist"
-    allowed_roles = {"admin", "tourist"}
+    # SECURITY: Validate role against allowlist - only allow "admin", "tourist", and "tourist_guide"
+    allowed_roles = {"admin", "tourist", "tourist_guide"}
     if user_data.role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role. Only 'admin' and 'tourist' roles are allowed."
+            detail="Invalid role. Only 'admin', 'tourist', and 'tourist_guide' roles are allowed."
         )
     
     # Create new user
@@ -344,6 +387,8 @@ async def login_form(
     # Set cookie and redirect based on role
     if str(user.role) == "admin":
         redirect_url = "/"
+    elif str(user.role) == "tourist_guide":
+        redirect_url = "/guide-dashboard"
     else:
         redirect_url = f"/tourist-dashboard"
     
@@ -360,8 +405,15 @@ async def login_form(
     return response
 
 @app.post("/auth/logout")
+async def logout_post():
+    """Logout user by clearing cookie (POST method)"""
+    response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    response.delete_cookie("access_token")
+    return response
+
+@app.get("/auth/logout")
 async def logout():
-    """Logout user by clearing cookie"""
+    """Logout user by clearing cookie (GET method for browser links)"""
     response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     response.delete_cookie("access_token")
     return response
@@ -439,6 +491,63 @@ async def register_tourist(
             "tourist_places": INDIAN_TOURIST_PLACES
         })
 
+@app.post("/register-guide")
+async def register_tourist_guide(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    specializations: str = Form(""),
+    db: AsyncSession = Depends(get_db)
+):
+    """Register a new tourist guide with both user account and guide profile"""
+    try:
+        # Check if user already exists
+        result = await db.execute(select(User).filter(User.email == email))
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            return templates.TemplateResponse("register_guide.html", {
+                "request": request,
+                "error": "Email already registered"
+            })
+        
+        # Create user account
+        hashed_password = User.get_password_hash(password)
+        new_user = User(
+            email=email,
+            hashed_password=hashed_password,
+            full_name=name,
+            role="tourist_guide"
+        )
+        
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        
+        # Create tourist guide profile
+        guide_id = TouristGuide.generate_guide_id(name)
+        
+        new_guide = TouristGuide(
+            user_id=new_user.id,
+            name=name,
+            guide_id=guide_id,
+            specializations=specializations if specializations else None
+        )
+        
+        db.add(new_guide)
+        await db.commit()
+        await db.refresh(new_guide)
+        
+        # Redirect to login page with success message
+        return RedirectResponse(url="/login?message=Guide registration successful! Please login.", status_code=status.HTTP_302_FOUND)
+        
+    except Exception as e:
+        # Return to registration form with error message
+        return templates.TemplateResponse("register_guide.html", {
+            "request": request,
+            "error": f"Registration failed: {str(e)}"
+        })
+
 @app.post("/update_location")
 async def update_location(
     location_data: LocationUpdate, 
@@ -458,11 +567,11 @@ async def update_location(
         raise HTTPException(status_code=404, detail="Tourist not found")
     
     # SECURITY: Default-deny authorization - only allow role="tourist" to update their own positions
-    # All other roles are explicitly denied
-    if str(current_user.role) != "tourist":
+    # Tourist guides can update their own guide position, not tourist positions
+    if str(current_user.role) not in ["tourist"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: Only tourists can update location positions"
+            detail="Access denied: Only tourists can update tourist location positions"
         )
     
     # Tourist users can only update their own location
@@ -507,12 +616,114 @@ async def update_location(
     
     return {"status": new_status, "inside_fence": inside_fence}
 
-@app.get("/dashboard")
-async def get_dashboard_data(
-    current_user: User = Depends(require_admin),
+class TouristLocationChange(BaseModel):
+    tourist_id: int
+    location_id: int
+
+@app.post("/change_tourist_location")
+async def change_tourist_location(
+    location_data: TouristLocationChange,
+    current_user: User = Depends(get_current_active_user_flexible),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all tourists data for dashboard"""
+    """Change tourist's assigned location"""
+    # Validate coordinates
+    if location_data.location_id not in [place["id"] for place in INDIAN_TOURIST_PLACES]:
+        raise HTTPException(status_code=400, detail="Invalid location ID")
+    
+    result = await db.execute(select(Tourist).filter(Tourist.id == location_data.tourist_id))
+    tourist = result.scalar_one_or_none()
+    if not tourist:
+        raise HTTPException(status_code=404, detail="Tourist not found")
+    
+    # SECURITY: Only allow tourists to change their own location
+    if str(current_user.role) != "tourist":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Only tourists can change their location"
+        )
+    
+    # Tourist users can only change their own location
+    if int(str(tourist.user_id)) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You can only change your own location"
+        )
+    
+    # Get the new tourist place
+    new_place = get_tourist_place_by_id(location_data.location_id)
+    
+    # Update tourist location and position
+    tourist.location_id = location_data.location_id
+    tourist.last_lat = new_place["lat"]
+    tourist.last_lon = new_place["lon"]
+    
+    # Check if tourist is in the new safe zone
+    inside_fence = is_inside_geofence(new_place["lat"], new_place["lon"], location_data.location_id)
+    tourist.status = "Safe" if inside_fence else "Critical"
+    
+    await db.commit()
+    
+    return {
+        "message": "Location changed successfully",
+        "new_location": new_place["name"],
+        "status": tourist.status,
+        "inside_fence": inside_fence
+    }
+
+class GuideLocationUpdate(BaseModel):
+    latitude: float
+    longitude: float
+    
+    def validate_coordinates(self):
+        if not (-90 <= self.latitude <= 90):
+            raise ValueError("Latitude must be between -90 and 90 degrees")
+        if not (-180 <= self.longitude <= 180):
+            raise ValueError("Longitude must be between -180 and 180 degrees")
+
+@app.post("/update_guide_location")
+async def update_guide_location(
+    location_data: GuideLocationUpdate, 
+    current_user: User = Depends(require_tourist_guide),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update tourist guide location"""
+    # Validate coordinates
+    try:
+        location_data.validate_coordinates()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Get guide profile
+    result = await db.execute(select(TouristGuide).filter(TouristGuide.user_id == current_user.id))
+    guide = result.scalar_one_or_none()
+    if not guide:
+        raise HTTPException(status_code=404, detail="Guide profile not found")
+    
+    # Update location
+    guide.current_lat = location_data.latitude
+    guide.current_lon = location_data.longitude
+    await db.commit()
+    
+    # Broadcast guide location update to all admins and other guides
+    update_message = {
+        "type": "guide_location_update",
+        "guide_id": guide.id,
+        "name": guide.name,
+        "latitude": location_data.latitude,
+        "longitude": location_data.longitude,
+        "is_available": guide.is_available
+    }
+    await manager.broadcast_to_admins_and_guides(update_message)
+    
+    return {"message": "Guide location updated successfully"}
+
+@app.get("/api/dashboard")
+async def get_dashboard_data(
+    current_user: User = Depends(require_admin_or_guide),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all tourists data for dashboard - accessible by admin and tourist guides"""
     result = await db.execute(select(Tourist))
     tourists = result.scalars().all()
     return [
@@ -529,10 +740,116 @@ async def get_dashboard_data(
         for tourist in tourists
     ]
 
+@app.get("/api/guide-dashboard")
+async def get_guide_dashboard_data(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all tourists and guides data for tourist guide dashboard"""
+    # Try to get current user, return error if not authenticated
+    from auth import get_user_from_cookie_token
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+    
+    if str(current_user.role) != "tourist_guide":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tourist guide access required"
+        )
+    # Get all tourists
+    result = await db.execute(select(Tourist))
+    tourists = result.scalars().all()
+    
+    # Get all guides
+    result = await db.execute(select(TouristGuide))
+    guides = result.scalars().all()
+    
+    tourists_data = [
+        {
+            "id": tourist.id,
+            "name": tourist.name,
+            "blockchain_id": tourist.blockchain_id,
+            "last_lat": tourist.last_lat,
+            "last_lon": tourist.last_lon,
+            "status": tourist.status,
+            "location_id": tourist.location_id,
+            "location_name": get_tourist_place_by_id(int(str(tourist.location_id)))["name"],
+            "type": "tourist"
+        }
+        for tourist in tourists
+    ]
+    
+    guides_data = [
+        {
+            "id": guide.id,
+            "name": guide.name,
+            "guide_id": guide.guide_id,
+            "current_lat": guide.current_lat,
+            "current_lon": guide.current_lon,
+            "is_available": guide.is_available,
+            "specializations": guide.specializations,
+            "type": "guide"
+        }
+        for guide in guides
+    ]
+    
+    return {
+        "tourists": tourists_data,
+        "guides": guides_data
+    }
+
 @app.get("/tourist-places")
 async def get_tourist_places():
     """Get all available Indian tourist places"""
     return INDIAN_TOURIST_PLACES
+
+@app.get("/api/guide-positions")
+async def get_guide_positions(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all guide positions for tourists to use as safe zones"""
+    # Try to get current user, return error if not authenticated
+    from auth import get_user_from_cookie_token
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+    
+    if str(current_user.role) != "tourist":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tourist access required"
+        )
+    
+    # Get all guides
+    result = await db.execute(select(TouristGuide))
+    guides = result.scalars().all()
+    
+    guides_data = [
+        {
+            "id": guide.id,
+            "name": guide.name,
+            "guide_id": guide.guide_id,
+            "current_lat": guide.current_lat,
+            "current_lon": guide.current_lon,
+            "is_available": guide.is_available,
+            "specializations": guide.specializations
+        }
+        for guide in guides
+    ]
+    
+    return {"guides": guides_data}
 
 @app.get("/map/{tourist_id}")
 async def get_map_data(
@@ -652,6 +969,14 @@ async def register_page(request: Request, error: Optional[str] = None):
         "tourist_places": INDIAN_TOURIST_PLACES
     })
 
+@app.get("/register-guide-form", response_class=HTMLResponse)
+async def register_guide_page(request: Request, error: Optional[str] = None):
+    """Registration page for tourist guides"""
+    return templates.TemplateResponse("register_guide.html", {
+        "request": request,
+        "error": error
+    })
+
 @app.get("/tourist-dashboard", response_class=HTMLResponse)
 async def tourist_dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Tourist dashboard page - shows only their own data"""
@@ -711,6 +1036,53 @@ async def tourist_dashboard_page(request: Request, db: AsyncSession = Depends(ge
         }
     })
 
+@app.get("/guide-dashboard", response_class=HTMLResponse)
+async def guide_dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
+    """Tourist guide dashboard page - shows all users and allows movement"""
+    # Try to get current user, redirect to login if not authenticated
+    from auth import get_user_from_cookie_token
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    
+    if str(current_user.role) != "tourist_guide":
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    
+    # Get guide data for this user
+    result = await db.execute(select(TouristGuide).filter(TouristGuide.user_id == current_user.id))
+    guide = result.scalar_one_or_none()
+    if not guide:
+        # Create guide profile if it doesn't exist
+        guide_id = TouristGuide.generate_guide_id(str(current_user.full_name))
+        
+        guide = TouristGuide(
+            user_id=current_user.id,
+            name=str(current_user.full_name),
+            guide_id=guide_id
+        )
+        
+        db.add(guide)
+        await db.commit()
+        await db.refresh(guide)
+    
+    guide_data = {
+        "id": guide.id,
+        "name": guide.name,
+        "guide_id": guide.guide_id,
+        "current_lat": guide.current_lat,
+        "current_lon": guide.current_lon,
+        "is_available": guide.is_available,
+        "specializations": guide.specializations
+    }
+    
+    return templates.TemplateResponse("guide_dashboard.html", {
+        "request": request,
+        "user": current_user,
+        "guide": guide_data
+    })
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Authority dashboard page"""
@@ -724,7 +1096,9 @@ async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     
     # Check if user is admin
-    if str(current_user.role) != "admin":
+    if str(current_user.role) == "tourist_guide":
+        return RedirectResponse(url="/guide-dashboard", status_code=status.HTTP_302_FOUND)
+    elif str(current_user.role) != "admin":
         return RedirectResponse(url="/tourist-dashboard", status_code=status.HTTP_302_FOUND)
     
     result = await db.execute(select(Tourist))
@@ -776,6 +1150,7 @@ async def tourist_map_page(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only view your own tourist map"
         )
+    # Tourist guides and admins can view any tourist map
     
     # Get the tourist's assigned location geofence
     tourist_place = get_tourist_place_by_id(int(str(tourist.location_id)))

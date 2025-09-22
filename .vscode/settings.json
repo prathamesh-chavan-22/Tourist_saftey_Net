@@ -1,0 +1,9 @@
+{
+  "html.validate.scripts": false,
+  "javascript.validate.enable": false,
+  "typescript.validate.enable": false,
+  "html.suggest.html5": true,
+  "emmet.includeLanguages": {
+    "html": "html"
+  }
+}

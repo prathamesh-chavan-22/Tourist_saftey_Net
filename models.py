@@ -18,12 +18,14 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
-    role = Column(String, nullable=False, default="tourist")  # admin or tourist
+    role = Column(String, nullable=False, default="tourist")  # admin, tourist, or tourist_guide
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationship to tourist (one-to-one)
     tourist = relationship("Tourist", back_populates="user", uselist=False)
+    # Relationship to tourist guide (one-to-one)
+    tourist_guide = relationship("TouristGuide", back_populates="user", uselist=False)
     
     def verify_password(self, password: str) -> bool:
         """Verify password against hashed password"""
@@ -54,6 +56,26 @@ class Tourist(Base):
     def generate_blockchain_id(cls, name: str) -> str:
         """Generate a mock blockchain ID using SHA256 hash"""
         return hashlib.sha256(f"{name}{datetime.now()}".encode()).hexdigest()
+
+class TouristGuide(Base):
+    __tablename__ = "tourist_guides"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    name = Column(String, nullable=False)
+    guide_id = Column(String, unique=True, nullable=False)
+    current_lat = Column(Float, default=27.1751)  # Default to Taj Mahal
+    current_lon = Column(Float, default=78.0421)
+    is_available = Column(Boolean, default=True)  # Available for guiding
+    specializations = Column(String, nullable=True)  # e.g., "Historical Sites, Museums"
+    
+    # Relationships
+    user = relationship("User", back_populates="tourist_guide")
+    
+    @classmethod
+    def generate_guide_id(cls, name: str) -> str:
+        """Generate a unique guide ID using SHA256 hash"""
+        return hashlib.sha256(f"guide_{name}{datetime.now()}".encode()).hexdigest()[:16]
 
 class Incident(Base):
     __tablename__ = "incidents"

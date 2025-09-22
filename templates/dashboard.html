@@ -4,69 +4,202 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tourist Safety Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/static/css/dashboard.css" />
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        .admin-badge {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .main-container {
+            padding: 2rem 0;
+        }
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border: none;
+            margin-bottom: 2rem;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            border: none;
+            padding: 1.5rem;
+        }
+        .card-title {
+            margin: 0;
+            font-weight: 600;
+        }
+        .map-container {
+            height: 500px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            color: white;
+            transform: translateY(-1px);
+        }
+        .tourist-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .tourist-table th,
+        .tourist-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .tourist-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        .tourist-table tr:hover {
+            background: #f8f9fa;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-safe {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .btn-view {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-view:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+    </style>
 </head>
 <body>
-    <div class="header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h1>🇮🇳 Smart Tourist Safety Monitoring Dashboard</h1>
-                <p>SIH 2025 Hackathon - Problem Statement 2: Real-time monitoring of tourist safety at India's top heritage sites</p>
-                <p><strong>Current Status:</strong> Prototype with live tracking, geofencing & emergency alerts • <strong>Future:</strong> AI risk prediction, IoT sensors, mobile app integration</p>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                Tourist Safety Net - Admin Dashboard
+                <span class="admin-badge ms-2">ADMIN</span>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">Monitoring all tourists</span>
+                <a href="/auth/logout" class="logout-btn">Logout</a>
             </div>
-            <div style="text-align: right;">
-                <div style="color: rgba(255,255,255,0.8); margin-bottom: 10px;">
-                    <strong>Admin Dashboard</strong><br>
-                    <small>Monitoring all tourists</small>
+        </div>
+    </nav>
+
+
+    <div class="container main-container">
+        <div class="row">
+            <!-- Tourists Table -->
+            <div class="col-lg-8">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-users me-2"></i>
+                            Tourists Status Overview
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="tourist-table" id="touristsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>ID</th>
+                                    <th>Tourist Site</th>
+                                    <th>Status</th>
+                                    <th>Coordinates</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tourist in tourists %}
+                                <tr data-tourist-id="{{ tourist.id }}">
+                                    <td>{{ tourist.name }}</td>
+                                    <td>{{ tourist.id }}</td>
+                                    <td>{{ tourist.location_name }}</td>
+                                    <td>
+                                        <span class="status-badge status-{{ tourist.status|lower }}">{{ tourist.status }}</span>
+                                    </td>
+                                    <td>{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</td>
+                                    <td>
+                                        <a href="/tourist/{{ tourist.id }}" class="btn-view">View Map</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <form method="post" action="/auth/logout" style="margin: 0;">
-                    <button type="submit" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Logout</button>
-                </form>
             </div>
-        </div>
-    </div>
 
-
-    <div class="dashboard">
-        <div class="tourists-panel">
-            <h3>📋 Tourists Status</h3>
-            <table class="tourist-table" id="touristsTable">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>ID</th>
-                        <th>Tourist Site</th>
-                        <th>Status</th>
-                        <th>Coordinates</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for tourist in tourists %}
-                    <tr data-tourist-id="{{ tourist.id }}">
-                        <td>{{ tourist.name }}</td>
-                        <td>{{ tourist.id }}</td>
-                        <td>{{ tourist.location_name }}</td>
-                        <td class="status-{{ tourist.status|lower }}">{{ tourist.status }}</td>
-                        <td>{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</td>
-                        <td>
-                            <a href="/tourist/{{ tourist.id }}" class="tourist-link">View Map</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="map-panel">
-            <h3>🗺️ Overview Map</h3>
-            <div id="map"></div>
+            <!-- Overview Map -->
+            <div class="col-lg-4">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-map me-2"></i>
+                            Overview Map
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="map" class="map-container"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script>
         // Initialize tourist markers with template data

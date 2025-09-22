@@ -4,71 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tourist Dashboard - {{ user.full_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .header {
-            background-color: #2c3e50;
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        .tourist-badge {
+            background: rgba(255,255,255,0.2);
             color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
         }
-        .header-left h1 {
-            margin: 0;
-            font-size: 24px;
+        .main-container {
+            padding: 2rem 0;
         }
-        .header-left p {
-            margin: 5px 0 0 0;
-            opacity: 0.8;
-        }
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .user-info {
-            text-align: right;
-        }
-        .logout-btn {
-            background: #dc3545;
-            color: white;
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
+            margin-bottom: 2rem;
         }
-        .logout-btn:hover {
-            background: #c82333;
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            border: none;
+            padding: 1.5rem;
+        }
+        .card-title {
+            margin: 0;
+            font-weight: 600;
+        }
+        .map-container {
+            height: 500px;
+            border-radius: 10px;
+            overflow: hidden;
         }
         .status-panel {
             background: white;
             padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
         }
         .status-item {
             text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
         .status-item h3 {
             margin: 0 0 10px 0;
             color: #666;
             font-size: 14px;
             text-transform: uppercase;
+            font-weight: 600;
         }
         .status-value {
             font-size: 18px;
@@ -83,18 +89,26 @@
         .dashboard {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 2rem;
         }
         .map-panel, .controls-panel {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 0;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .map-panel .card-header {
+            margin: 0;
+            border-radius: 0;
+        }
+        .map-panel .card-body {
+            padding: 0;
         }
         #map {
-            height: 400px;
-            border-radius: 4px;
-            border: 2px solid #ddd;
+            height: 500px;
+            border-radius: 0;
+            border: none;
         }
         .arrow-keys {
             display: grid;
@@ -105,22 +119,23 @@
             margin: 20px 0;
         }
         .arrow-key {
-            background: #007bff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
-            border-radius: 4px;
+            border-radius: 10px;
             color: white;
             font-size: 20px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
         }
         .arrow-key:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
         .arrow-key:active {
-            background: #004085;
             transform: scale(0.95);
         }
         .arrow-up { grid-column: 2; grid-row: 1; }
@@ -130,100 +145,216 @@
         .info-section {
             background: #e8f4ff;
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-top: 20px;
         }
         .alert {
             padding: 15px;
-            border-radius: 4px;
+            border-radius: 10px;
             margin: 10px 0;
             display: none;
+            border: none;
         }
         .alert-warning {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
             color: #856404;
         }
         .alert-success {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
             color: #155724;
+        }
+        .location-selector {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .location-selector h4 {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .location-selector select {
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        .location-selector select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .location-selector button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        }
+        .location-selector button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            color: white;
+            transform: translateY(-1px);
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">
-            <h1>🇮🇳 Tourist Safety Dashboard</h1>
-            <p>Real-time location monitoring at {{ tourist.location_name }}</p>
-        </div>
-        <div class="header-right">
-            <div class="user-info">
-                <div><strong>{{ user.full_name }}</strong></div>
-                <div style="font-size: 12px; opacity: 0.8;">Tourist ID: {{ tourist.id }}</div>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-map-marked-alt me-2"></i>
+                Tourist Safety Net - Tourist Dashboard
+                <span class="tourist-badge ms-2">TOURIST</span>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">Welcome, {{ user.full_name }}</span>
+                <a href="/auth/logout" class="logout-btn">Logout</a>
             </div>
-            <form method="post" action="/auth/logout" style="margin: 0;">
-                <button type="submit" class="logout-btn">Logout</button>
-            </form>
         </div>
-    </div>
+    </nav>
 
-    <div class="status-panel">
-        <div class="status-item">
-            <h3>Current Status</h3>
-            <div id="status" class="status-value status-{{ tourist.status|lower }}">{{ tourist.status }}</div>
-        </div>
-        <div class="status-item">
-            <h3>Location</h3>
-            <div id="coordinates" class="status-value">{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</div>
-        </div>
-        <div class="status-item">
-            <h3>Tourist Site</h3>
-            <div class="status-value">{{ tourist.location_name }}</div>
-        </div>
-        <div class="status-item">
-            <h3>Blockchain ID</h3>
-            <div class="status-value" style="font-size: 12px;">{{ tourist.blockchain_id[:12] }}...</div>
-        </div>
-    </div>
-
-    <div class="dashboard">
-        <div class="map-panel">
-            <h3>🗺️ Your Location & Safe Zone</h3>
-            <div id="map"></div>
-        </div>
-
-        <div class="controls-panel">
-            <h3>🎮 Movement Controls</h3>
-            <p>Use these controls or your arrow keys to simulate movement:</p>
-            
-            <div class="arrow-keys">
-                <button class="arrow-key arrow-up" data-direction="up">↑</button>
-                <button class="arrow-key arrow-left" data-direction="left">←</button>
-                <button class="arrow-key arrow-down" data-direction="down">↓</button>
-                <button class="arrow-key arrow-right" data-direction="right">→</button>
+    <div class="container main-container">
+        <!-- Status Overview -->
+        <div class="status-panel">
+            <div class="status-item">
+                <h3>Current Status</h3>
+                <div id="status" class="status-value status-{{ tourist.status|lower }}">{{ tourist.status }}</div>
             </div>
+            <div class="status-item">
+                <h3>Location</h3>
+                <div id="coordinates" class="status-value">{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</div>
+            </div>
+            <div class="status-item">
+                <h3>Tourist Site</h3>
+                <div class="status-value">{{ tourist.location_name }}</div>
+            </div>
+            <div class="status-item">
+                <h3>Blockchain ID</h3>
+                <div class="status-value" style="font-size: 12px;">{{ tourist.blockchain_id[:12] }}...</div>
+            </div>
+        </div>
 
-            <div class="info-section">
-                <h4>📍 How It Works</h4>
-                <ul>
-                    <li><strong>Green Status:</strong> You're in the safe zone</li>
-                    <li><strong>Red Status:</strong> You've left the safe area</li>
-                    <li><strong>Movement:</strong> Use arrow keys or buttons to move</li>
-                    <li><strong>Real-time:</strong> Your status updates automatically</li>
-                </ul>
+        <div class="row">
+            <!-- Map Section -->
+            <div class="col-lg-8">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h5 class="card-title">
+                            <i class="fas fa-map me-2"></i>
+                            Your Location & Safe Zones
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="map" class="map-container"></div>
+                    </div>
+                </div>
             </div>
 
-            <div id="statusAlert" class="alert"></div>
+            <!-- Controls and Info -->
+            <div class="col-lg-4">
+                <!-- Movement Controls -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-gamepad me-2"></i>
+                            Movement Controls
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <p>Use these controls or your arrow keys to simulate movement:</p>
+                        
+                        <div class="arrow-keys">
+                            <button class="arrow-key arrow-up" data-direction="up">↑</button>
+                            <button class="arrow-key arrow-left" data-direction="left">←</button>
+                            <button class="arrow-key arrow-down" data-direction="down">↓</button>
+                            <button class="arrow-key arrow-right" data-direction="right">→</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location Selector -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            Change Location
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="location-selector">
+                            <h4>📍 Tourist Location</h4>
+                            <p>Select a different tourist location to visit:</p>
+                            <select id="locationSelect">
+                                <option value="1" {% if tourist.location_id == 1 %}selected{% endif %}>Taj Mahal, Agra</option>
+                                <option value="2" {% if tourist.location_id == 2 %}selected{% endif %}>Red Fort, Delhi</option>
+                                <option value="3" {% if tourist.location_id == 3 %}selected{% endif %}>Gateway of India, Mumbai</option>
+                                <option value="4" {% if tourist.location_id == 4 %}selected{% endif %}>Hawa Mahal, Jaipur</option>
+                                <option value="5" {% if tourist.location_id == 5 %}selected{% endif %}>Golden Temple, Amritsar</option>
+                                <option value="6" {% if tourist.location_id == 6 %}selected{% endif %}>India Gate, New Delhi</option>
+                                <option value="7" {% if tourist.location_id == 7 %}selected{% endif %}>Mysore Palace, Mysore</option>
+                            </select>
+                            <button id="changeLocationBtn">
+                                Change Location
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Section -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            How It Works
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-section">
+                            <ul style="margin: 0; padding-left: 20px;">
+                                <li><strong>Green Status:</strong> You're within 500m of an available guide</li>
+                                <li><strong>Red Status:</strong> You're not near any guide (unsafe)</li>
+                                <li><strong>Movement:</strong> Use arrow keys or buttons to move</li>
+                                <li><strong>Dynamic Safe Zones:</strong> Safe zones follow guide movement</li>
+                                <li><strong>Real-time:</strong> Your status updates automatically</li>
+                            </ul>
+                        </div>
+                        <div id="statusAlert" class="alert"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    
     <script>
-        // Current tourist data
-        let currentLat = {{ tourist.last_lat }};
-        let currentLon = {{ tourist.last_lon }};
-        const touristId = {{ tourist.id }};
+        /* eslint-disable no-undef */
+        // Current tourist data - these are populated by Jinja2 template
+        let currentLat = {{ tourist.last_lat|tojson }};
+        let currentLon = {{ tourist.last_lon|tojson }};
+        const touristId = {{ tourist.id|tojson }};
+        /* eslint-enable no-undef */
+        let safeZoneCircles = [];
+        let guideMarkers = [];
 
         // Initialize map
         const map = L.map('map').setView([currentLat, currentLon], 16);
@@ -232,16 +363,52 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Add geofence circle
-        const geofenceCenter = [{{ geofence.center_lat }}, {{ geofence.center_lon }}];
-        const geofenceRadius = {{ geofence.radius }};
-        
-        L.circle(geofenceCenter, {
-            color: 'green',
-            fillColor: '#90EE90',
-            fillOpacity: 0.2,
-            radius: geofenceRadius
-        }).addTo(map).bindPopup('Safe Zone: {{ geofence.name }}');
+        // Load guide positions and create safe zones
+        async function loadGuidePositions() {
+            try {
+                const response = await fetch('/api/guide-positions');
+                const data = await response.json();
+                
+                // Clear existing safe zones and guide markers
+                safeZoneCircles.forEach(circle => map.removeLayer(circle));
+                guideMarkers.forEach(marker => map.removeLayer(marker));
+                safeZoneCircles = [];
+                guideMarkers = [];
+                
+                // Create safe zones around each available guide
+                data.guides.forEach(guide => {
+                    if (guide.is_available && guide.current_lat && guide.current_lon) {
+                        // Create safe zone circle around guide
+                        const safeZone = L.circle([guide.current_lat, guide.current_lon], {
+                            color: '#28a745',
+                            fillColor: '#28a745',
+                            fillOpacity: 0.15,
+                            radius: 500, // 500 meters radius
+                            weight: 2
+                        }).addTo(map);
+                        
+                        safeZone.bindPopup(`<b>Safe Zone</b><br>Guide: ${guide.name}<br>500m radius`);
+                        safeZoneCircles.push(safeZone);
+                        
+                        // Add guide marker
+                        const guideMarker = L.marker([guide.current_lat, guide.current_lon], {
+                            icon: L.divIcon({
+                                className: 'guide-marker',
+                                html: '<div style="background: #ffc107; color: white; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">G</div>',
+                                iconSize: [25, 25],
+                                iconAnchor: [12, 12]
+                            })
+                        }).addTo(map);
+                        
+                        guideMarker.bindPopup(`<b>Guide: ${guide.name}</b><br>Available: ${guide.is_available ? 'Yes' : 'No'}`);
+                        guideMarkers.push(guideMarker);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error loading guide positions:', error);
+            }
+        }
 
         // Add tourist marker
         const touristMarker = L.marker([currentLat, currentLon], {
@@ -251,7 +418,7 @@
                 iconSize: [30, 30],
                 iconAnchor: [15, 15]
             })
-        }).addTo(map).bindPopup('{{ user.full_name }}');
+        }).addTo(map).bindPopup({{ user.full_name|tojson }}); // Jinja2 template variable
 
         // WebSocket connection for live updates
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -293,6 +460,43 @@
             }, 3000);
         }
 
+        // Check if tourist is within any guide's safe zone
+        function checkSafeZoneStatus(lat, lon) {
+            let isInSafeZone = false;
+            let nearestGuide = null;
+            let minDistance = Infinity;
+            
+            safeZoneCircles.forEach((circle, index) => {
+                const guideLat = circle.getLatLng().lat;
+                const guideLon = circle.getLatLng().lng;
+                
+                // Calculate distance to guide
+                const distance = calculateDistance(lat, lon, guideLat, guideLon);
+                
+                if (distance <= 500) { // 500 meters radius
+                    isInSafeZone = true;
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearestGuide = guideMarkers[index];
+                    }
+                }
+            });
+            
+            return { isInSafeZone, nearestGuide, minDistance };
+        }
+
+        // Calculate distance between two points in meters
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth's radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
         async function moveLocation(direction) {
             const moveDistance = 0.0001; // Small movement increment
             let newLat = currentLat;
@@ -304,6 +508,10 @@
                 case 'left': newLon -= moveDistance; break;
                 case 'right': newLon += moveDistance; break;
             }
+            
+            // Check safe zone status locally first
+            const safeZoneStatus = checkSafeZoneStatus(newLat, newLon);
+            const newStatus = safeZoneStatus.isInSafeZone ? 'Safe' : 'Critical';
             
             try {
                 const response = await fetch('/update_location', {
@@ -324,9 +532,14 @@
                 }
                 
                 const data = await response.json();
-                updateLocation(newLat, newLon, data.status);
-                showAlert(data.inside_fence ? 'You are in the safe zone!' : 'Warning: You have left the safe zone!', 
-                         data.inside_fence ? 'success' : 'warning');
+                updateLocation(newLat, newLon, newStatus);
+                
+                if (safeZoneStatus.isInSafeZone) {
+                    const distance = Math.round(safeZoneStatus.minDistance);
+                    showAlert(`You are in the safe zone! Nearest guide: ${distance}m away`, 'success');
+                } else {
+                    showAlert('Warning: You have left the safe zone! Find a guide nearby.', 'warning');
+                }
                 
             } catch (error) {
                 console.error('Error updating location:', error);
@@ -363,6 +576,46 @@
                 const direction = this.getAttribute('data-direction');
                 moveLocation(direction);
             });
+        });
+
+        // Location change functionality
+        document.getElementById('changeLocationBtn').addEventListener('click', async function() {
+            const newLocationId = document.getElementById('locationSelect').value;
+            
+            try {
+                const response = await fetch('/change_tourist_location', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getCookie('access_token')}`
+                    },
+                    body: JSON.stringify({
+                        tourist_id: touristId,
+                        location_id: parseInt(newLocationId)
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to change location');
+                }
+                
+                const data = await response.json();
+                
+                // Update the page with new location data
+                location.reload(); // Simple reload to get new data
+                
+            } catch (error) {
+                console.error('Error changing location:', error);
+                showAlert('Failed to change location. Please try again.', 'warning');
+            }
+        });
+
+        // Initialize guide positions and safe zones when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGuidePositions();
+            
+            // Refresh guide positions every 30 seconds
+            setInterval(loadGuidePositions, 30000);
         });
     </script>
 </body>

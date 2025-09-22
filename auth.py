@@ -121,6 +121,24 @@ async def require_tourist(current_user: User = Depends(get_current_active_user))
         )
     return current_user
 
+async def require_tourist_guide(current_user: User = Depends(get_current_active_user)):
+    """Require tourist guide role"""
+    if str(current_user.role) != "tourist_guide":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tourist guide access required"
+        )
+    return current_user
+
+async def require_admin_or_guide(current_user: User = Depends(get_current_active_user)):
+    """Require admin or tourist guide role"""
+    if str(current_user.role) not in ["admin", "tourist_guide"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or tourist guide access required"
+        )
+    return current_user
+
 async def get_user_from_cookie_token(access_token: Optional[str], db: AsyncSession) -> Optional[User]:
     """Manually get user from cookie token - for use in template endpoints"""
     if not access_token:
