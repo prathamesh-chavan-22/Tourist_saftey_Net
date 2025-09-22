@@ -5,77 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tourist Safety Dashboard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .header {
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .controls {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        .tourists-panel, .map-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .tourist-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .tourist-table th, .tourist-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        .tourist-table th {
-            background-color: #f8f9fa;
-        }
-        .status-safe {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .status-critical {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        #map {
-            height: 400px;
-            border-radius: 4px;
-        }
-        .tourist-link {
-            color: #007bff;
-            text-decoration: none;
-        }
-        .tourist-link:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
 </head>
 <body>
     <div class="header">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <h1>🇮🇳 Smart Tourist Safety Monitoring Dashboard</h1>
-                <p>SIH 2024 Hackathon - Problem Statement 2: Real-time monitoring of tourist safety at India's top heritage sites</p>
+                <p>SIH 2025 Hackathon - Problem Statement 2: Real-time monitoring of tourist safety at India's top heritage sites</p>
                 <p><strong>Current Status:</strong> Prototype with live tracking, geofencing & emergency alerts • <strong>Future:</strong> AI risk prediction, IoT sensors, mobile app integration</p>
             </div>
             <div style="text-align: right;">
@@ -130,81 +67,23 @@
 
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/js/dashboard.js"></script>
     <script>
-        // Initialize map centered on India
-        const map = L.map('map').setView([20.5937, 78.9629], 5);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-
-        // Add all Indian tourist places
-        const touristPlaces = [
-            {id: 1, name: "Taj Mahal, Agra", lat: 27.1751, lon: 78.0421, radius: 500},
-            {id: 2, name: "Red Fort, Delhi", lat: 28.6562, lon: 77.2410, radius: 400},
-            {id: 3, name: "Gateway of India, Mumbai", lat: 18.9220, lon: 72.8347, radius: 300},
-            {id: 4, name: "Hawa Mahal, Jaipur", lat: 26.9239, lon: 75.8267, radius: 300},
-            {id: 5, name: "Golden Temple, Amritsar", lat: 31.6200, lon: 74.8765, radius: 400},
-            {id: 6, name: "India Gate, New Delhi", lat: 28.6129, lon: 77.2295, radius: 400},
-            {id: 7, name: "Mysore Palace, Mysore", lat: 12.3051, lon: 76.6551, radius: 400}
+        // Initialize tourist markers with template data
+        const tourists = [
+            {% for tourist in tourists %}
+            {
+                id: {{ tourist.id }},
+                name: "{{ tourist.name }}",
+                last_lat: {{ tourist.last_lat }},
+                last_lon: {{ tourist.last_lon }},
+                status: "{{ tourist.status }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
         ];
-
-        // Add geofence circles for all tourist places
-        touristPlaces.forEach(place => {
-            L.circle([place.lat, place.lon], {
-                color: 'green',
-                fillColor: '#90EE90',
-                fillOpacity: 0.2,
-                radius: place.radius
-            }).addTo(map).bindPopup(`<b>${place.name}</b><br>Safe Zone: ${place.radius}m radius`);
-        });
-
-        // Add tourist markers
-        const touristMarkers = {};
-        {% for tourist in tourists %}
-        const marker{{ tourist.id }} = L.marker([{{ tourist.last_lat }}, {{ tourist.last_lon }}])
-            .addTo(map)
-            .bindPopup('<b>{{ tourist.name }}</b><br>Status: {{ tourist.status }}');
-        touristMarkers[{{ tourist.id }}] = marker{{ tourist.id }};
-        {% endfor %}
-
-        // WebSocket connection for live updates
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host;
-        const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
         
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'location_update') {
-                updateTouristOnMap(data);
-                updateTouristInTable(data);
-            }
-        };
-
-        function updateTouristOnMap(data) {
-            if (touristMarkers[data.tourist_id]) {
-                touristMarkers[data.tourist_id].setLatLng([data.latitude, data.longitude]);
-                touristMarkers[data.tourist_id].setPopupContent(`<b>${data.name}</b><br>Status: ${data.status}`);
-            } else {
-                const marker = L.marker([data.latitude, data.longitude])
-                    .addTo(map)
-                    .bindPopup(`<b>${data.name}</b><br>Status: ${data.status}`);
-                touristMarkers[data.tourist_id] = marker;
-            }
-        }
-
-        function updateTouristInTable(data) {
-            // Update existing row or add new one
-            const table = document.getElementById('touristsTable').getElementsByTagName('tbody')[0];
-            const existingRow = document.querySelector(`tr[data-tourist-id="${data.tourist_id}"]`);
-            
-            if (existingRow) {
-                existingRow.children[3].textContent = data.status;
-                existingRow.children[3].className = `status-${data.status.toLowerCase()}`;
-                existingRow.children[4].textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
-            }
-        }
-
+        // Initialize tourist markers from template data
+        initializeTouristMarkers(tourists);
     </script>
 </body>
 </html>
