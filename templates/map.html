@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tourist Map - {{ tourist.name }}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+        .status-item {
+            text-align: center;
+        }
+        .status-safe {
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .status-critical {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .map-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #map {
+            height: 500px;
+            border-radius: 4px;
+            border: 2px solid #ddd;
+        }
+        .controls-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .arrow-keys {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 5px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .arrow-key {
+            background: #007bff;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .arrow-key:hover {
+            background: #0056b3;
+        }
+        .arrow-key:active {
+            background: #004085;
+            transform: scale(0.95);
+        }
+        .arrow-up { grid-column: 2; grid-row: 1; }
+        .arrow-left { grid-column: 1; grid-row: 2; }
+        .arrow-down { grid-column: 2; grid-row: 2; }
+        .arrow-right { grid-column: 3; grid-row: 2; }
+        .movement-info {
+            text-align: center;
+            margin-top: 15px;
+            color: #666;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .dashboard-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .dashboard-link:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🇮🇳 Tourist Map - {{ tourist.name }}</h1>
+        <p><strong>Location:</strong> {{ geofence.name }} | <strong>Safe Zone:</strong> {{ geofence.radius }}m radius</p>
+        <p>Use arrow keys (↑↓←→) to move around and monitor your safety status in real-time</p>
+        <a href="/" class="dashboard-link">← Back to Dashboard</a>
+    </div>
+
+    <div class="status-panel">
+        <div class="status-item">
+            <h3>Current Status</h3>
+            <div id="status" class="status-{{ tourist.status|lower }}">{{ tourist.status }}</div>
+        </div>
+        <div class="status-item">
+            <h3>Location</h3>
+            <div id="coordinates">{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</div>
+        </div>
+        <div class="status-item">
+            <h3>Tourist ID</h3>
+            <div>{{ tourist.id }}</div>
+        </div>
+    </div>
+
+    <div id="alertContainer">
+        <div id="warningAlert" class="alert alert-warning">
+            ⚠️ <strong>Warning!</strong> You are outside the safe zone. Please return to the designated area.
+        </div>
+        <div id="safeAlert" class="alert alert-success">
+            ✅ <strong>Safe!</strong> You are within the protected area.
+        </div>
+    </div>
+
+    <div class="map-container">
+        <h3>Live Location Map</h3>
+        <div id="map"></div>
+    </div>
+
+    <div class="controls-panel">
+        <h3>Movement Controls</h3>
+        <p>Use the arrow keys on your keyboard or click the buttons below to move:</p>
+        
+        <div class="arrow-keys">
+            <button class="arrow-key arrow-up" data-direction="up">↑</button>
+            <button class="arrow-key arrow-left" data-direction="left">←</button>
+            <button class="arrow-key arrow-down" data-direction="down">↓</button>
+            <button class="arrow-key arrow-right" data-direction="right">→</button>
+        </div>
+        
+        <div class="movement-info">
+            <small>Each movement step is approximately 0.001 degrees (~111 meters)</small><br>
+            <small><strong>SIH 2024 PS-2:</strong> Smart Tourist Safety Monitoring System</small>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Tourist and geofence data
+        const tourist = {
+            id: {{ tourist.id }},
+            name: "{{ tourist.name }}",
+            lat: {{ tourist.last_lat }},
+            lon: {{ tourist.last_lon }},
+            status: "{{ tourist.status }}"
+        };
+
+        const geofence = {
+            centerLat: {{ geofence.center_lat }},
+            centerLon: {{ geofence.center_lon }},
+            radius: {{ geofence.radius }}
+        };
+
+        // Initialize map
+        const map = L.map('map').setView([tourist.lat, tourist.lon], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Add geofence circle using template data
+        const geofenceCircle = L.circle([{{ geofence.center_lat }}, {{ geofence.center_lon }}], {
+            color: 'green',
+            fillColor: '#90EE90',
+            fillOpacity: 0.3,
+            radius: {{ geofence.radius }},
+            weight: 3
+        }).addTo(map).bindPopup('<b>Safe Zone</b><br>{{ geofence.name }}<br>Radius: {{ geofence.radius }}m');
+
+        // Add tourist marker
+        const touristMarker = L.marker([tourist.lat, tourist.lon], {
+            draggable: false
+        }).addTo(map).bindPopup(`<b>${tourist.name}</b><br>Status: ${tourist.status}`);
+
+        // Current position
+        let currentLat = tourist.lat;
+        let currentLon = tourist.lon;
+        const moveStep = 0.001; // Approximately 111 meters
+
+        // WebSocket connection
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.host;
+        const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'location_update' && data.tourist_id === tourist.id) {
+                updateStatus(data);
+            }
+        };
+
+        // Movement functions
+        function moveUp() { moveDirection(moveStep, 0); }
+        function moveDown() { moveDirection(-moveStep, 0); }
+        function moveLeft() { moveDirection(0, -moveStep); }
+        function moveRight() { moveDirection(0, moveStep); }
+
+        function moveDirection(latChange, lonChange) {
+            currentLat += latChange;
+            currentLon += lonChange;
+            
+            // Update marker position
+            touristMarker.setLatLng([currentLat, currentLon]);
+            map.setView([currentLat, currentLon]);
+            
+            // Update coordinates display
+            document.getElementById('coordinates').textContent = 
+                `${currentLat.toFixed(4)}, ${currentLon.toFixed(4)}`;
+            
+            // Send location update to server
+            updateLocation();
+        }
+
+        async function updateLocation() {
+            try {
+                const response = await fetch('/update_location', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tourist_id: tourist.id,
+                        latitude: currentLat,
+                        longitude: currentLon
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    updateStatusDisplay(result.status, result.inside_fence);
+                }
+            } catch (error) {
+                console.error('Error updating location:', error);
+            }
+        }
+
+        function updateStatus(data) {
+            updateStatusDisplay(data.status, data.inside_fence);
+            touristMarker.setPopupContent(`<b>${data.name}</b><br>Status: ${data.status}`);
+        }
+
+        function updateStatusDisplay(status, insideFence) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = status;
+            statusElement.className = `status-${status.toLowerCase()}`;
+            
+            // Show/hide alerts
+            const warningAlert = document.getElementById('warningAlert');
+            const safeAlert = document.getElementById('safeAlert');
+            
+            if (insideFence) {
+                warningAlert.style.display = 'none';
+                safeAlert.style.display = 'block';
+            } else {
+                warningAlert.style.display = 'block';
+                safeAlert.style.display = 'none';
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', function(event) {
+            switch(event.key) {
+                case 'ArrowUp':
+                    event.preventDefault();
+                    moveUp();
+                    break;
+                case 'ArrowDown':
+                    event.preventDefault();
+                    moveDown();
+                    break;
+                case 'ArrowLeft':
+                    event.preventDefault();
+                    moveLeft();
+                    break;
+                case 'ArrowRight':
+                    event.preventDefault();
+                    moveRight();
+                    break;
+            }
+        });
+
+        // Button controls
+        document.querySelectorAll('.arrow-key').forEach(button => {
+            button.addEventListener('click', function() {
+                const direction = this.getAttribute('data-direction');
+                switch(direction) {
+                    case 'up': moveUp(); break;
+                    case 'down': moveDown(); break;
+                    case 'left': moveLeft(); break;
+                    case 'right': moveRight(); break;
+                }
+            });
+        });
+
+        // Initialize status display
+        const insideFence = tourist.status === 'Safe';
+        updateStatusDisplay(tourist.status, insideFence);
+
+        // Set focus on window to capture keyboard events
+        window.focus();
+    </script>
+</body>
+</html>
