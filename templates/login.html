@@ -133,6 +133,100 @@
             font-size: 12px;
             color: #6c757d;
         }
+        .info-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #007bff;
+        }
+        .info-section h4 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 16px;
+        }
+        .info-section ol, .info-section ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .info-section li {
+            margin-bottom: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .sih-badge {
+            background: #e8f4ff;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .info-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+        .info-btn {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #495057;
+            transition: all 0.3s;
+        }
+        .info-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .modal-title {
+            margin: 0;
+            color: #007bff;
+            font-size: 18px;
+        }
+        .close {
+            color: #aaa;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+        .close:hover {
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -184,6 +278,70 @@
                 <strong>Tourist:</strong> tourist@demo.com / tourist123
             </div>
         </div>
+
+        <div class="info-buttons">
+            <button class="info-btn" onclick="showModal('howToUseModal')">📋 How to Use</button>
+            <button class="info-btn" onclick="showModal('futureModal')">🚀 Future Plans</button>
+        </div>
+    </div>
+
+    <!-- How to Use Modal -->
+    <div id="howToUseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">📋 How to Use This Prototype</h4>
+                <button class="close" onclick="closeModal('howToUseModal')">&times;</button>
+            </div>
+            <ol>
+                <li><strong>Login:</strong> Use demo credentials above or register as tourist</li>
+                <li><strong>View Dashboard:</strong> Admin sees all tourists, tourists see their own map</li>
+                <li><strong>Move with Arrow Keys:</strong> Use ↑↓←→ keys or click directional buttons to simulate movement</li>
+                <li><strong>Monitor Safety:</strong> Green status = Safe, Red status = Outside safe zone</li>
+                <li><strong>Real-time Updates:</strong> Watch live location changes across multiple browser tabs</li>
+            </ol>
+            
+            <h4 style="color: #007bff; margin-top: 20px;">🎯 Current Capabilities</h4>
+            <ul>
+                <li>✅ Real-time tourist location tracking with WebSocket updates</li>
+                <li>✅ Geofencing for 7 major Indian heritage sites</li>
+                <li>✅ Instant safety alerts when leaving safe zones</li>
+                <li>✅ Multi-tourist monitoring dashboard</li>
+                <li>✅ Arrow key movement simulation</li>
+                <li>✅ Blockchain-based tourist ID generation</li>
+                <li>✅ Incident logging and status tracking</li>
+                <li>✅ Secure user authentication and role management</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Future Plans Modal -->
+    <div id="futureModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">🚀 Future Development Plans</h4>
+                <button class="close" onclick="closeModal('futureModal')">&times;</button>
+            </div>
+            <ul>
+                <li><strong>🔗 Blockchain GPS Implementation:</strong> Immutable location history and secure GPS data verification</li>
+                <li><strong>📞 Call & Email Integration:</strong> Automated emergency calls and email alerts to authorities</li>
+                <li><strong>🤖 AI Chat Service:</strong> Intelligent tourist assistance and emergency response chatbot</li>
+                <li><strong>📱 Mobile App:</strong> Native Android/iOS apps with offline capabilities and push notifications</li>
+                <li><strong>🔄 Smart Switch Button:</strong> One-click emergency mode activation and panic button</li>
+                <li><strong>🤖 AI-Powered Risk Assessment:</strong> Machine learning models to predict potential safety threats</li>
+                <li><strong>🌐 IoT Sensor Network:</strong> Environmental sensors for crowd density, weather alerts</li>
+                <li><strong>🚨 Emergency Response System:</strong> Automated alerts to local authorities and emergency services</li>
+                <li><strong>📊 Analytics Dashboard:</strong> Tourist flow patterns, hotspot analysis, predictive insights</li>
+                <li><strong>🔐 Advanced Security:</strong> Biometric authentication, encrypted communications</li>
+                <li><strong>🌍 Multi-language Support:</strong> Interface in Hindi, English, and regional languages</li>
+                <li><strong>📞 Integration with Local Services:</strong> Hotels, transport, medical facilities</li>
+            </ul>
+            
+            <div class="sih-badge">
+                <strong>🏆 SIH 2024 - Problem Statement 2</strong><br>
+                <em>"Smart Tourist Safety Monitoring & Incident Response System"</em><br>
+                <small>This prototype demonstrates core functionality with scope for comprehensive IoT and AI integration.</small>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -213,6 +371,22 @@
             document.getElementById('email').value = 'admin@demo.com';
             document.getElementById('password').value = 'admin123';
         });
+
+        // Modal functions
+        function showModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>
