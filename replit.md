@@ -4,6 +4,21 @@ The Smart Tourist Safety Monitoring & Incident Response System is a FastAPI-base
 
 The system uses a simple rule-based AI approach where tourists are classified as "Safe" when inside geofenced areas and "Critical" when outside, with incidents automatically logged to the database. Mock blockchain IDs are generated for each tourist using SHA256 hashing.
 
+## Recent Changes
+
+**September 23, 2025** - Major Code Modularization:
+- Refactored monolithic `app.py` (800+ lines) into modular architecture
+- Created `config.py` for centralized configuration and constants  
+- Created `schemas.py` for Pydantic request/response models
+- Created `services.py` for business logic (geofencing, tourist places, demo users)
+- Created `websocket_manager.py` for WebSocket connection management
+- Created `routers/` directory with separate route modules:
+  - `routers/auth.py` - Authentication endpoints
+  - `routers/admin.py` - Admin dashboard endpoints  
+  - `routers/tourist.py` - Tourist-specific endpoints
+- Maintained all existing functionality and backwards compatibility
+- Improved code organization and maintainability without breaking changes
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
