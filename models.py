@@ -75,8 +75,20 @@ class Incident(Base):
     tourist = relationship("Tourist", back_populates="incidents")
 
 # Database configuration
-DATABASE_URL = "sqlite+aiosqlite:///./tourist_safety.db"
-engine = create_async_engine(DATABASE_URL, echo=True)
+import os
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required")
+
+# Convert postgresql:// or postgres:// to postgresql+asyncpg:// for async driver
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
+# Use echo=False in production to avoid logging sensitive data
+engine = create_async_engine(DATABASE_URL, echo=os.environ.get("DEBUG", "False").lower() == "true")
 AsyncSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
 
 async def get_db():
