@@ -129,6 +129,7 @@ async def update_location(
     
     # Store trip data before session operations to avoid detachment issues
     trip_id = trip.id
+    trip_user_id = trip.user_id
     # Get user name for the trip
     user_result = await db.execute(select(User).filter(User.id == trip.user_id))
     user = user_result.scalar_one_or_none()
@@ -155,7 +156,7 @@ async def update_location(
     update_message = {
         "type": "location_update",
         "trip_id": int(str(trip_id)),
-        "tourist_id": int(str(trip.user_id)),
+        "tourist_id": int(str(trip_user_id)),
         "name": trip_user_name,
         "latitude": location_data.latitude,
         "longitude": location_data.longitude,
