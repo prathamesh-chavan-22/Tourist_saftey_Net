@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Form, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import json
 
 from models import User, Trip, Incident, get_db
 from schemas import LocationUpdate
@@ -83,6 +84,32 @@ async def register_tourist(
         db.add(new_trip)
         await db.commit()
         await db.refresh(new_trip)
+        
+        # Store trip data to avoid detachment issues
+        trip_id = new_trip.id
+        
+        # Notify admin dashboard about new tourist with active trip
+        trip_start_message = {
+            "type": "tourist_status_change",
+            "action": "trip_started",
+            "tourist_id": user_id,
+            "trip_id": trip_id,
+            "name": name,
+            "email": email,
+            "contact_number": "+000000000",  # Placeholder - matches user creation
+            "age": 25,  # Placeholder - matches user creation
+            "gender": "M",  # Placeholder - matches user creation
+            "blockchain_id": blockchain_id,
+            "starting_location": "Not specified",
+            "last_lat": tourist_place["lat"],
+            "last_lon": tourist_place["lon"],
+            "status": "Safe",
+            "tourist_destination_id": location_id,
+            "location_name": tourist_place["name"],
+            "hotels": None,
+            "mode_of_travel": "Not specified"
+        }
+        await manager.broadcast_to_admins(json.dumps(trip_start_message))
         
         # Redirect to login page with success message
         return RedirectResponse(url="/login?message=Registration successful! Please login.", status_code=status.HTTP_302_FOUND)
