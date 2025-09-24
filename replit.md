@@ -6,6 +6,15 @@ The system uses a simple rule-based AI approach where tourists are classified as
 
 ## Recent Changes
 
+**September 24, 2025** - Registration Flow Simplification & UX Improvements:
+- **Simplified Registration Form**: Updated registration to collect only essential user information (name, age, email, contact, password)
+- **Removed Forced Trip Selection**: Eliminated mandatory tourist destination selection during registration process
+- **Automatic Login Implementation**: Users are now automatically logged in after successful registration using JWT tokens and secure HTTP-only cookies
+- **Streamlined User Journey**: Registration now redirects directly to tourist dashboard instead of login page
+- **Removed Auto-Trip Creation**: Registration no longer automatically creates trips, allowing users to plan trips when ready
+- **Legacy Endpoint Cleanup**: Removed conflicting legacy `/register` endpoint that caused parameter mismatches
+- **Enhanced User Experience**: New users can quickly create accounts and explore the platform without forced trip planning
+
 **September 23, 2025** - Major Code Modularization & PostgreSQL Migration:
 - Refactored monolithic `app.py` (800+ lines) into modular architecture
 - Created `config.py` for centralized configuration and constants  
