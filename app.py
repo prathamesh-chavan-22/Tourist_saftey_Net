@@ -86,18 +86,6 @@ async def get_map_data_legacy(
     from routers.tourist import get_map_data
     return await get_map_data(tourist_id, current_user, db)
 
-@app.post("/register")
-async def register_tourist_legacy(
-    request: Request,
-    name: str = Form(...),
-    email: str = Form(...),
-    password: str = Form(...),
-    location_id: int = Form(...),
-    db: AsyncSession = Depends(get_db)
-):
-    """Legacy registration endpoint - redirect to tourist router"""
-    from routers.tourist import register_tourist
-    return await register_tourist(request, name, email, password, location_id, db)
 
 @app.get("/me")
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
@@ -180,8 +168,7 @@ async def register_page(request: Request, error: Optional[str] = None):
     """Registration page for tourists"""
     return templates.TemplateResponse("register.html", {
         "request": request,
-        "error": error,
-        "tourist_places": INDIAN_TOURIST_PLACES
+        "error": error
     })
 
 @app.get("/tourist-dashboard", response_class=HTMLResponse)

@@ -11,7 +11,7 @@ from schemas import LocationUpdate
 from services import get_tourist_place_by_id, is_inside_geofence
 from websocket_manager import ConnectionManager
 from config import INDIAN_TOURIST_PLACES
-from auth import get_current_active_user, get_current_active_user_flexible
+from auth import get_current_active_user, get_current_active_user_flexible, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(prefix="/tourist", tags=["tourist"])
 
@@ -27,9 +27,10 @@ def set_connection_manager(connection_manager: ConnectionManager):
 async def register_tourist(
     request: Request,
     name: str = Form(...),
+    age: int = Form(...),
+    contact_number: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    location_id: int = Form(...),
     db: AsyncSession = Depends(get_db)
 ):
     """Register a new tourist with both user account and tourist profile"""
@@ -42,19 +43,18 @@ async def register_tourist(
             templates = Jinja2Templates(directory="templates")
             return templates.TemplateResponse("register.html", {
                 "request": request,
-                "error": "Email already registered",
-                "tourist_places": INDIAN_TOURIST_PLACES
+                "error": "Email already registered"
             })
         
-        # Create user account (TODO: This should be updated to use new UserRegistration schema with contact_number, age, gender)
+        # Create user account
         hashed_password = User.get_password_hash(password)
         new_user = User(
             email=email,
             hashed_password=hashed_password,
             full_name=name,
-            contact_number="+000000000",  # Temporary placeholder - need to update registration form
-            age=25,  # Temporary placeholder - need to update registration form  
-            gender="M",  # Temporary placeholder - need to update registration form
+            contact_number=contact_number,
+            age=age,
+            gender="M",  # Default gender - can be updated later in profile
             role="tourist"
         )
         
@@ -62,57 +62,22 @@ async def register_tourist(
         await db.commit()
         await db.refresh(new_user)
         
-        # Store user data to avoid detachment issues
-        user_id = new_user.id
+        # Create access token for auto-login
+        access_token = create_access_token(data={"sub": new_user.email})
         
-        # TODO: Update to new trip-based flow - should redirect to trip creation instead of auto-creating trip
-        # Create initial trip profile for backward compatibility
-        blockchain_id = Trip.generate_blockchain_id(name, get_tourist_place_by_id(location_id)["name"])
-        tourist_place = get_tourist_place_by_id(location_id)
-        
-        new_trip = Trip(
-            user_id=user_id,
-            blockchain_id=blockchain_id,
-            starting_location="Not specified",  # Placeholder - need trip creation form
-            tourist_destination_id=location_id,
-            hotels=None,
-            mode_of_travel="Not specified",  # Placeholder - need trip creation form
-            last_lat=tourist_place["lat"],
-            last_lon=tourist_place["lon"]
+        # Create response to redirect to tourist dashboard and set login cookie
+        response = RedirectResponse(url="/tourist-dashboard", status_code=status.HTTP_302_FOUND)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            path="/",
+            samesite="lax"
         )
         
-        db.add(new_trip)
-        await db.commit()
-        await db.refresh(new_trip)
-        
-        # Store trip data to avoid detachment issues
-        trip_id = new_trip.id
-        
-        # Notify admin dashboard about new tourist with active trip
-        trip_start_message = {
-            "type": "tourist_status_change",
-            "action": "trip_started",
-            "tourist_id": user_id,
-            "trip_id": trip_id,
-            "name": name,
-            "email": email,
-            "contact_number": "+000000000",  # Placeholder - matches user creation
-            "age": 25,  # Placeholder - matches user creation
-            "gender": "M",  # Placeholder - matches user creation
-            "blockchain_id": blockchain_id,
-            "starting_location": "Not specified",
-            "last_lat": tourist_place["lat"],
-            "last_lon": tourist_place["lon"],
-            "status": "Safe",
-            "tourist_destination_id": location_id,
-            "location_name": tourist_place["name"],
-            "hotels": None,
-            "mode_of_travel": "Not specified"
-        }
-        await manager.broadcast_to_admins(json.dumps(trip_start_message))
-        
-        # Redirect to login page with success message
-        return RedirectResponse(url="/login?message=Registration successful! Please login.", status_code=status.HTTP_302_FOUND)
+        return response
         
     except Exception as e:
         # Return to registration form with error message
@@ -120,8 +85,7 @@ async def register_tourist(
         templates = Jinja2Templates(directory="templates")
         return templates.TemplateResponse("register.html", {
             "request": request,
-            "error": f"Registration failed: {str(e)}",
-            "tourist_places": INDIAN_TOURIST_PLACES
+            "error": f"Registration failed: {str(e)}"
         })
 
 @router.post("/update_location")

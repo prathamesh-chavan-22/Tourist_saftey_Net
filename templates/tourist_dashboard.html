@@ -5,162 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tourist Dashboard - {{ user.full_name }}</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .header {
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .header-left h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .header-left p {
-            margin: 5px 0 0 0;
-            opacity: 0.8;
-        }
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .user-info {
-            text-align: right;
-        }
-        .logout-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .logout-btn:hover {
-            background: #c82333;
-        }
-        .status-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 20px;
-        }
-        .status-item {
-            text-align: center;
-        }
-        .status-item h3 {
-            margin: 0 0 10px 0;
-            color: #666;
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-        .status-value {
-            font-size: 18px;
-            font-weight: bold;
-        }
-        .status-safe {
-            color: #28a745;
-        }
-        .status-critical {
-            color: #dc3545;
-        }
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        .map-panel, .controls-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        #map {
-            height: 400px;
-            border-radius: 4px;
-            border: 2px solid #ddd;
-        }
-        .arrow-keys {
-            display: grid;
-            grid-template-columns: repeat(3, 60px);
-            grid-template-rows: repeat(3, 60px);
-            gap: 5px;
-            justify-content: center;
-            margin: 20px 0;
-        }
-        .arrow-key {
-            background: #007bff;
-            border: none;
-            border-radius: 4px;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.2s;
-        }
-        .arrow-key:hover {
-            background: #0056b3;
-        }
-        .arrow-key:active {
-            background: #004085;
-            transform: scale(0.95);
-        }
-        .arrow-up { grid-column: 2; grid-row: 1; }
-        .arrow-left { grid-column: 1; grid-row: 2; }
-        .arrow-down { grid-column: 2; grid-row: 2; }
-        .arrow-right { grid-column: 3; grid-row: 2; }
-        .info-section {
-            background: #e8f4ff;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        .alert {
-            padding: 15px;
-            border-radius: 4px;
-            margin: 10px 0;
-            display: none;
-        }
-        .alert-warning {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-        }
-        .alert-success {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/tourist.css" />
 </head>
 <body>
     <div class="header">
         <div class="header-left">
             <h1>🇮🇳 Tourist Safety Dashboard</h1>
-            <p>Tourist Safety Dashboard</p>
+            <p>Welcome, {{ user.full_name }}!</p>
         </div>
         <div class="header-right">
             <div class="user-info">
-                <div><strong>{{ user.full_name }}</strong></div>
-                <div style="font-size: 12px; opacity: 0.8;">User: {{ user.email }}</div>
+                <strong>{{ user.email }}</strong><br>
+                <small>Tourist Account</small>
             </div>
             <form method="post" action="/auth/logout" style="margin: 0;">
                 <button type="submit" class="logout-btn">Logout</button>
@@ -168,188 +24,285 @@
         </div>
     </div>
 
-    {% if message %}
-    <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-        {{ message }}
-    </div>
-    {% endif %}
-    
     {% if error %}
-    <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+    <div class="alert alert-danger">
         {{ error }}
     </div>
     {% endif %}
 
-    <div class="status-panel">
-        <div class="status-item">
-            <h3>Current Status</h3>
-            {% if active_trip %}<div id="status" class="status-value status-{{ active_trip.status|lower }}">{{ active_trip.status }}</div>{% else %}<div class="status-value">No Active Trip</div>{% endif %}
-        </div>
-        <div class="status-item">
-            <h3>Location</h3>
-            {% if active_trip %}<div id="coordinates" class="status-value">{{ "%.4f"|format(active_trip.last_lat) }}, {{ "%.4f"|format(active_trip.last_lon) }}</div>{% else %}<div class="status-value">-</div>{% endif %}
-        </div>
-        <div class="status-item">
-            <h3>Tourist Site</h3>
-            {% if active_trip %}<div class="status-value">{{ active_trip.tourist_destination_name }}</div>{% else %}<div class="status-value">-</div>{% endif %}
-        </div>
-        <div class="status-item">
-            <h3>Blockchain ID</h3>
-            {% if active_trip %}<div class="status-value" style="font-size: 12px;">{{ active_trip.blockchain_id[:12] }}...</div>{% else %}<div class="status-value">-</div>{% endif %}
+    {% if message %}
+    <div class="alert alert-success">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    <!-- Active Trip Status Panel -->
+    {% if active_trip %}
+    <div class="single-panel">
+        <h3>🗺️ Active Trip Status</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; text-align: center;">
+            <div>
+                <h4>Status</h4>
+                <div class="status-value status-{{ active_trip.status|lower }}">{{ active_trip.status }}</div>
+            </div>
+            <div>
+                <h4>Location</h4>
+                <div class="status-value">{{ "%.4f"|format(active_trip.last_lat) }}, {{ "%.4f"|format(active_trip.last_lon) }}</div>
+            </div>
+            <div>
+                <h4>Destination</h4>
+                <div class="status-value">{{ active_trip.tourist_destination_name }}</div>
+            </div>
+            <div>
+                <h4>Trip ID</h4>
+                <div class="status-value">{{ active_trip.id }}</div>
+            </div>
         </div>
     </div>
+    {% endif %}
 
-    <div class="dashboard">
+    <!-- Main Content -->
+    {% if active_trip %}
+    <div class="content">
+        <!-- Active Trip Panel -->
+        <div class="trip-panel">
+            <h3>📍 Current Trip Details</h3>
+            <table class="trip-table">
+                <tr>
+                    <td><strong>Blockchain ID:</strong></td>
+                    <td>{{ active_trip.blockchain_id }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Starting Location:</strong></td>
+                    <td>{{ active_trip.starting_location }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Destination:</strong></td>
+                    <td>{{ active_trip.tourist_destination_name }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Hotels:</strong></td>
+                    <td>{{ active_trip.hotels or "Not specified" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Travel Mode:</strong></td>
+                    <td>{{ active_trip.mode_of_travel }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Status:</strong></td>
+                    <td><span class="status-{{ active_trip.status|lower }}">{{ active_trip.status }}</span></td>
+                </tr>
+            </table>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="/trip/{{ active_trip.id }}" class="trip-link">View Live Map</a>
+                
+                <form method="post" action="/close-trip" style="display: inline-block; margin-left: 10px;">
+                    <input type="hidden" name="trip_id" value="{{ active_trip.id }}">
+                    <button type="submit" class="close-trip-btn" onclick="return confirm('Are you sure you want to close this trip?')">Close Trip</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Map Panel -->
         <div class="map-panel">
-            <h3>🗺️ Your Location & Safe Zone</h3>
+            <h3>🗺️ Your Location</h3>
             <div id="map"></div>
         </div>
 
+        <!-- Movement Controls Panel -->
         <div class="controls-panel">
             <h3>🎮 Movement Controls</h3>
-            <p>Use these controls or your arrow keys to simulate movement:</p>
+            <p>Use arrow keys on your keyboard or click the buttons below:</p>
             
-            <div class="arrow-keys">
-                <button class="arrow-key arrow-up" data-direction="up">↑</button>
-                <button class="arrow-key arrow-left" data-direction="left">←</button>
-                <button class="arrow-key arrow-down" data-direction="down">↓</button>
-                <button class="arrow-key arrow-right" data-direction="right">→</button>
+            <div class="arrow-keys" style="display: grid; grid-template-columns: repeat(3, 50px); gap: 5px; justify-content: center; margin: 20px 0;">
+                <div></div>
+                <button class="arrow-key" data-direction="up" style="padding: 10px; font-size: 18px; border: 2px solid #007bff; background: #f8f9fa; border-radius: 4px; cursor: pointer;">↑</button>
+                <div></div>
+                <button class="arrow-key" data-direction="left" style="padding: 10px; font-size: 18px; border: 2px solid #007bff; background: #f8f9fa; border-radius: 4px; cursor: pointer;">←</button>
+                <button class="arrow-key" data-direction="down" style="padding: 10px; font-size: 18px; border: 2px solid #007bff; background: #f8f9fa; border-radius: 4px; cursor: pointer;">↓</button>
+                <button class="arrow-key" data-direction="right" style="padding: 10px; font-size: 18px; border: 2px solid #007bff; background: #f8f9fa; border-radius: 4px; cursor: pointer;">→</button>
             </div>
-
-            <div class="info-section">
-                {% if active_trip %}
-                <h4>🎮 Trip Controls</h4>
-                <form method="post" action="/close-trip" style="margin: 10px 0;">
-                    <input type="hidden" name="trip_id" value="{{ active_trip.id }}">
-                    <button type="submit" class="logout-btn" style="background: #dc3545; width: 100%;" onclick="return confirm('Are you sure you want to close this trip?')">Close Current Trip</button>
-                </form>
-                <h4>📍 How It Works</h4>
-                <ul>
-                    <li><strong>Green Status:</strong> You're in the safe zone</li>
-                    <li><strong>Red Status:</strong> You've left the safe area</li>
-                    <li><strong>Movement:</strong> Use arrow keys or buttons to move</li>
-                    <li><strong>Real-time:</strong> Your status updates automatically</li>
-                </ul>
-                {% else %}
-                <h4>🎯 Trip Management</h4>
-                <a href="/create-trip" class="logout-btn" style="background: #28a745; text-decoration: none; display: block; text-align: center; margin: 10px 0;">Create New Trip</a>
-                <p>You don't have an active trip. Create one to start location tracking!</p>
-                {% endif %}
+            
+            <div style="text-align: center; margin-top: 10px;">
+                <small>Each step moves approximately 111 meters</small>
             </div>
-
-            <div id="statusAlert" class="alert"></div>
-        </div>
-        
-        <div class="controls-panel">
-            <h3>📋 Past Trips</h3>
-            {% if past_trips %}
-            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
-                {% for trip in past_trips %}
-                <div style="border-bottom: 1px solid #eee; padding: 8px 0; font-size: 14px;">
-                    <strong>{{ trip.tourist_destination_name }}</strong><br>
-                    <span style="color: #666;">From: {{ trip.starting_location }}</span><br>
-                    <span style="color: #666;">Travel: {{ trip.mode_of_travel }}</span><br>
-                    <span style="color: #666;">Created: {{ trip.created_at.strftime('%Y-%m-%d') }}</span>
-                    {% if trip.closed_at %}<br><span style="color: #666;">Closed: {{ trip.closed_at.strftime('%Y-%m-%d') }}</span>{% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p style="font-size: 14px; color: #666; text-align: center; padding: 20px;">No past trips yet.</p>
-            {% endif %}
         </div>
     </div>
+    {% else %}
+    <!-- No Active Trip -->
+    <div class="single-panel" style="text-align: center;">
+        <h3>🧳 No Active Trip</h3>
+        <p>You don't have any active trips. Create a new trip to start tracking your location and ensure your safety during travel.</p>
+        <a href="/create-trip" class="create-trip-btn">🚀 Create New Trip</a>
+    </div>
+    {% endif %}
+
+    <!-- Past Trips -->
+    {% if past_trips %}
+    <div class="single-panel">
+        <h3>📚 Trip History ({{ past_trips|length }})</h3>
+        <table class="trip-table">
+            <thead>
+                <tr>
+                    <th>Destination</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Duration</th>
+                    <th>Final Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trip in past_trips %}
+                <tr>
+                    <td>{{ trip.tourist_destination_name }}</td>
+                    <td>{{ trip.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ trip.closed_at.strftime('%Y-%m-%d') if trip.closed_at else 'N/A' }}</td>
+                    <td>
+                        {% if trip.closed_at %}
+                            {{ (trip.closed_at - trip.created_at).days }} days
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td><span class="status-inactive">Completed</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Current tourist data
         {% if active_trip %}
+        // Initialize current coordinates for movement tracking
         let currentLat = {{ active_trip.last_lat }};
         let currentLon = {{ active_trip.last_lon }};
-        const tripId = {{ active_trip.id }};
-        {% else %}
-        let currentLat = {{ geofence.center_lat }};
-        let currentLon = {{ geofence.center_lon }};
-        const tripId = null;
-        {% endif %}
-
-        // Initialize map
-        const map = L.map('map').setView([currentLat, currentLon], 16);
+        
+        // Initialize map for active trip
+        const map = L.map('map').setView([currentLat, currentLon], 13);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
-
-        // Add geofence circle
-        const geofenceCenter = [{{ geofence.center_lat }}, {{ geofence.center_lon }}];
-        const geofenceRadius = {{ geofence.radius }};
         
-        L.circle(geofenceCenter, {
+        // Add geofence circle
+        L.circle([{{ geofence.center_lat }}, {{ geofence.center_lon }}], {
             color: 'green',
             fillColor: '#90EE90',
             fillOpacity: 0.2,
-            radius: geofenceRadius
-        }).addTo(map).bindPopup('Safe Zone: {{ geofence.name }}');
-
-        // Add tourist marker
-        const touristMarker = L.marker([currentLat, currentLon], {
-            icon: L.divIcon({
-                className: 'tourist-marker',
-                html: '👤',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            })
-        }).addTo(map).bindPopup('{{ user.full_name }}');
+            radius: {{ geofence.radius }}
+        }).addTo(map).bindPopup('<b>{{ geofence.name }}</b><br>Safe Zone: {{ geofence.radius }}m radius');
         
-        {% if not active_trip %}
-        // Disable movement if no active trip
-        function showNoTripAlert() {
-            showAlert('No active trip! Create a trip first to use movement controls.', 'warning');
-        }
-        {% endif %}
-
-        // WebSocket connection for live updates
+        // Add current location marker
+        const marker = L.marker([{{ active_trip.last_lat }}, {{ active_trip.last_lon }}])
+            .addTo(map)
+            .bindPopup('<b>Your Current Location</b><br>Status: {{ active_trip.status }}')
+            .openPopup();
+        
+        // WebSocket for real-time updates
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;
         const ws = new WebSocket(`${wsProtocol}//${wsHost}/ws/location`);
         
+        ws.onopen = function(event) {
+            console.log('WebSocket connection established');
+        };
+        
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
-            if (data.type === 'location_update' && data.trip_id === tripId) {
-                updateLocation(data.latitude, data.longitude, data.status);
-                showAlert(data.inside_fence ? 'You are in the safe zone!' : 'Warning: You have left the safe zone!', 
-                         data.inside_fence ? 'success' : 'warning');
+            console.log('WebSocket message received:', data);
+            
+            if (data.type === 'location_update' && data.trip_id === {{ active_trip.id }}) {
+                // Update current coordinates for movement tracking
+                currentLat = data.latitude;
+                currentLon = data.longitude;
+                
+                // Update marker position
+                marker.setLatLng([data.latitude, data.longitude]);
+                marker.setPopupContent(`<b>Your Current Location</b><br>Status: ${data.status}`);
+                
+                // Update status on page
+                document.querySelectorAll('.status-value').forEach(elem => {
+                    if (elem.textContent.includes('Safe') || elem.textContent.includes('Critical')) {
+                        elem.textContent = data.status;
+                        elem.className = `status-value status-${data.status.toLowerCase()}`;
+                    }
+                });
+                
+                // Update coordinates
+                document.querySelectorAll('.status-value').forEach(elem => {
+                    if (elem.textContent.includes(',')) {
+                        elem.textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
+                    }
+                });
             }
         };
+        
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+        
+        ws.onclose = function(event) {
+            console.log('WebSocket connection closed');
+            setTimeout(() => {
+                console.log('Attempting to reconnect...');
+                location.reload(); // Simple reconnect strategy
+            }, 3000);
+        };
 
-        function updateLocation(lat, lon, status) {
-            currentLat = lat;
-            currentLon = lon;
-            
-            // Update marker position
-            touristMarker.setLatLng([lat, lon]);
-            
-            // Update status display
-            document.getElementById('status').textContent = status;
-            document.getElementById('status').className = `status-value status-${status.toLowerCase()}`;
-            
-            // Update coordinates display
-            document.getElementById('coordinates').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        }
-
+        // Movement functionality
         function showAlert(message, type) {
             const alertElement = document.getElementById('statusAlert');
-            alertElement.textContent = message;
-            alertElement.className = `alert alert-${type}`;
-            alertElement.style.display = 'block';
+            if (!alertElement) {
+                // Create alert element if it doesn't exist
+                const newAlert = document.createElement('div');
+                newAlert.id = 'statusAlert';
+                newAlert.className = 'alert';
+                newAlert.style.display = 'none';
+                newAlert.style.position = 'fixed';
+                newAlert.style.top = '20px';
+                newAlert.style.left = '50%';
+                newAlert.style.transform = 'translateX(-50%)';
+                newAlert.style.zIndex = '1000';
+                newAlert.style.padding = '10px 20px';
+                newAlert.style.borderRadius = '4px';
+                document.body.appendChild(newAlert);
+            }
+            const alert = document.getElementById('statusAlert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+            
+            // Set alert colors
+            if (type === 'success') {
+                alert.style.backgroundColor = '#d4edda';
+                alert.style.color = '#155724';
+                alert.style.border = '1px solid #c3e6cb';
+            } else if (type === 'warning') {
+                alert.style.backgroundColor = '#fff3cd';
+                alert.style.color = '#856404';
+                alert.style.border = '1px solid #ffeaa7';
+            } else if (type === 'danger') {
+                alert.style.backgroundColor = '#f8d7da';
+                alert.style.color = '#721c24';
+                alert.style.border = '1px solid #f5c6cb';
+            }
+            
+            alert.style.display = 'block';
             
             setTimeout(() => {
-                alertElement.style.display = 'none';
+                alert.style.display = 'none';
             }, 3000);
         }
 
         async function moveLocation(direction) {
-            const moveDistance = 0.0001; // Small movement increment
+            {% if not active_trip %}
+            showAlert('No active trip! Create a trip first to use movement controls.', 'warning');
+            return;
+            {% endif %}
+
+            const moveDistance = 0.001; // Movement step
             let newLat = currentLat;
             let newLon = currentLon;
             
@@ -365,10 +318,9 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${getCookie('access_token')}`
                     },
                     body: JSON.stringify({
-                        trip_id: tripId,
+                        trip_id: {{ active_trip.id if active_trip else 'null' }},
                         latitude: newLat,
                         longitude: newLon
                     })
@@ -379,20 +331,39 @@
                 }
                 
                 const data = await response.json();
-                updateLocation(newLat, newLon, data.status);
+                updateLocationOnMap(newLat, newLon, data.status);
                 showAlert(data.inside_fence ? 'You are in the safe zone!' : 'Warning: You have left the safe zone!', 
                          data.inside_fence ? 'success' : 'warning');
                 
             } catch (error) {
                 console.error('Error updating location:', error);
-                showAlert('Failed to update location. Please try again.', 'warning');
+                showAlert('Failed to update location. Please try again.', 'danger');
             }
         }
 
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
+        function updateLocationOnMap(lat, lon, status) {
+            {% if active_trip %}
+            currentLat = lat;
+            currentLon = lon;
+            
+            // Update marker position
+            marker.setLatLng([lat, lon]);
+            
+            // Update status display
+            document.querySelectorAll('.status-value').forEach(elem => {
+                if (elem.textContent.includes('Safe') || elem.textContent.includes('Critical') || elem.textContent.includes('Warning')) {
+                    elem.textContent = status;
+                    elem.className = `status-value status-${status.toLowerCase()}`;
+                }
+            });
+            
+            // Update coordinates display
+            document.querySelectorAll('.status-value').forEach(elem => {
+                if (elem.textContent.includes(',')) {
+                    elem.textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                }
+            });
+            {% endif %}
         }
 
         // Arrow key controls
@@ -412,13 +383,14 @@
             }
         });
 
-        // Button controls
+        // Button controls (if arrow key buttons exist)
         document.querySelectorAll('.arrow-key').forEach(button => {
             button.addEventListener('click', function() {
                 const direction = this.getAttribute('data-direction');
                 moveLocation(direction);
             });
         });
+        {% endif %}
     </script>
 </body>
 </html>

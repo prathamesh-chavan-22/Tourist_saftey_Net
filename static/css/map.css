@@ -1,15 +1,35 @@
-body {
+/* Map CSS - Dynamic theming based on user role */
+body.tourist-theme {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 20px;
-    background-color: #f5f5f5;
+    background-color: #F5F5F5; /* Tourist: Light Gray */
+    color: #333333; /* Tourist: Dark Charcoal Gray */
 }
-.header {
-    background-color: #2c3e50;
+
+body.admin-theme {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #ECF0F1; /* Admin: Off-White/Light Gray */
+    color: #2C3E50; /* Admin: Dark Gray */
+}
+
+.header.tourist-theme {
+    background-color: #007BFF; /* Tourist: Deep Sky Blue */
     color: white;
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
+}
+
+.header.admin-theme {
+    background-color: #003366; /* Admin: Deep Navy Blue */
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #BDC3C7;
 }
 .status-panel {
     background: white;
@@ -24,13 +44,36 @@ body {
 .status-item {
     text-align: center;
 }
-.status-safe {
-    color: #28a745;
+/* Tourist Status Colors */
+.tourist-theme .status-safe {
+    color: #28A745; /* Tourist: Bright Green */
     font-weight: bold;
     font-size: 1.2em;
 }
-.status-critical {
-    color: #dc3545;
+.tourist-theme .status-critical {
+    color: #DC3545; /* Tourist: Clear Red */
+    font-weight: bold;
+    font-size: 1.2em;
+}
+.tourist-theme .status-warning {
+    color: #FFC107; /* Tourist: Warm Amber */
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+/* Admin Status Colors */
+.admin-theme .status-safe {
+    color: #2ECC71; /* Admin: Emerald Green */
+    font-weight: bold;
+    font-size: 1.2em;
+}
+.admin-theme .status-critical {
+    color: #E74C3C; /* Admin: Crimson Red */
+    font-weight: bold;
+    font-size: 1.2em;
+}
+.admin-theme .status-warning {
+    color: #F1C40F; /* Admin: Goldenrod Yellow */
     font-weight: bold;
     font-size: 1.2em;
 }
@@ -60,8 +103,9 @@ body {
     justify-content: center;
     margin: 20px 0;
 }
-.arrow-key {
-    background: #007bff;
+/* Tourist Arrow Keys */
+.tourist-theme .arrow-key {
+    background: #FF9500; /* Tourist: Warm Orange for action */
     border: none;
     border-radius: 4px;
     color: white;
@@ -72,12 +116,29 @@ body {
     justify-content: center;
     transition: background-color 0.2s;
 }
-.arrow-key:hover {
-    background: #0056b3;
+.tourist-theme .arrow-key:hover {
+    background: #e68500;
 }
-.arrow-key:active {
-    background: #004085;
+.tourist-theme .arrow-key:active {
+    background: #cc7700;
     transform: scale(0.95);
+}
+
+/* Admin Arrow Keys (read-only view) */
+.admin-theme .arrow-key {
+    background: #95A5A6; /* Admin: Disabled gray */
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-size: 20px;
+    cursor: not-allowed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+}
+.admin-theme .arrow-key:hover {
+    background: #95A5A6; /* No hover effect for admin */
 }
 .arrow-up { grid-column: 2; grid-row: 1; }
 .arrow-left { grid-column: 1; grid-row: 2; }
@@ -94,25 +155,56 @@ body {
     margin: 10px 0;
     display: none;
 }
-.alert-warning {
-    background-color: #fff3cd;
-    border: 1px solid #ffeaa7;
+/* Tourist Alerts */
+.tourist-theme .alert-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    border: 1px solid #FFC107;
     color: #856404;
 }
-.alert-success {
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
+.tourist-theme .alert-success {
+    background-color: rgba(40, 167, 69, 0.1);
+    border: 1px solid #28A745;
     color: #155724;
 }
-.dashboard-link {
+
+/* Admin Alerts */
+.admin-theme .alert-warning {
+    background-color: rgba(241, 196, 15, 0.1);
+    border: 1px solid #F1C40F;
+    color: #856404;
+}
+.admin-theme .alert-success {
+    background-color: rgba(46, 204, 113, 0.1);
+    border: 1px solid #2ECC71;
+    color: #155724;
+}
+
+/* Tourist Dashboard Link */
+.tourist-theme .dashboard-link {
     display: inline-block;
     margin-top: 10px;
     padding: 10px 20px;
-    background: #6c757d;
+    background: #007BFF; /* Tourist: Deep Sky Blue */
     color: white;
     text-decoration: none;
     border-radius: 4px;
+    transition: background-color 0.3s;
 }
-.dashboard-link:hover {
-    background: #5a6268;
+.tourist-theme .dashboard-link:hover {
+    background: #0056b3;
+}
+
+/* Admin Dashboard Link */
+.admin-theme .dashboard-link {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 20px;
+    background: #00A7E1; /* Admin: Electric Blue */
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+.admin-theme .dashboard-link:hover {
+    background: #0086b3;
 }

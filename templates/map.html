@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/static/css/map.css" />
 </head>
-<body>
-    <div class="header">
+<body class="{% if current_user.role == 'admin' %}admin-theme{% else %}tourist-theme{% endif %}">
+    <div class="header {% if current_user.role == 'admin' %}admin-theme{% else %}tourist-theme{% endif %}">
         <h1>🇮🇳 Tourist Map - {{ tourist.name }}</h1>
         <p><strong>Location:</strong> {{ geofence.name }} | <strong>Safe Zone:</strong> {{ geofence.radius }}m radius</p>
         {% if current_user.role == "admin" %}
