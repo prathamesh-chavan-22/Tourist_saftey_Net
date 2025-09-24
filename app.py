@@ -296,18 +296,26 @@ async def create_trip_submit(
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     
     try:
+        # Store user data before session operations to avoid detachment issues
+        user_id = current_user.id
+        user_full_name = current_user.full_name
+        user_email = current_user.email
+        user_contact_number = current_user.contact_number
+        user_age = current_user.age
+        user_gender = current_user.gender
+        
         # Check if user already has an active trip
-        result = await db.execute(select(Trip).filter(Trip.user_id == current_user.id, Trip.is_active == True))
+        result = await db.execute(select(Trip).filter(Trip.user_id == user_id, Trip.is_active == True))
         active_trip = result.scalar_one_or_none()
         if active_trip:
             return RedirectResponse(url="/tourist-dashboard?error=You already have an active trip", status_code=status.HTTP_302_FOUND)
         
         # Create the new trip
         tourist_place = get_tourist_place_by_id(tourist_destination_id)
-        blockchain_id = Trip.generate_blockchain_id(str(current_user.full_name), tourist_place["name"])
+        blockchain_id = Trip.generate_blockchain_id(str(user_full_name), tourist_place["name"])
         
         new_trip = Trip(
-            user_id=current_user.id,
+            user_id=user_id,
             blockchain_id=blockchain_id,
             starting_location=starting_location,
             tourist_destination_id=tourist_destination_id,
@@ -321,18 +329,21 @@ async def create_trip_submit(
         await db.commit()
         await db.refresh(new_trip)
         
+        # Store trip data after commit to avoid detachment issues
+        trip_id = new_trip.id
+        
         # Notify admin dashboard about tourist becoming active
         tourist_place = get_tourist_place_by_id(tourist_destination_id)
         trip_start_message = {
             "type": "tourist_status_change",
             "action": "trip_started",
-            "tourist_id": current_user.id,
-            "trip_id": new_trip.id,
-            "name": current_user.full_name,
-            "email": current_user.email,
-            "contact_number": current_user.contact_number,
-            "age": current_user.age,
-            "gender": current_user.gender,
+            "tourist_id": user_id,
+            "trip_id": trip_id,
+            "name": user_full_name,
+            "email": user_email,
+            "contact_number": user_contact_number,
+            "age": user_age,
+            "gender": user_gender,
             "blockchain_id": blockchain_id,
             "starting_location": starting_location,
             "last_lat": tourist_place["lat"],
@@ -388,6 +399,14 @@ async def close_trip(
         if not trip:
             return RedirectResponse(url="/tourist-dashboard?error=Trip not found or already closed", status_code=status.HTTP_302_FOUND)
         
+        # Store user data before session operations to avoid detachment issues
+        user_id = current_user.id
+        user_full_name = current_user.full_name
+        user_email = current_user.email
+        user_contact_number = current_user.contact_number
+        user_age = current_user.age
+        user_gender = current_user.gender
+        
         # Close the trip using SQLAlchemy update
         from datetime import datetime
         from sqlalchemy import update
@@ -404,13 +423,13 @@ async def close_trip(
         trip_end_message = {
             "type": "tourist_status_change",
             "action": "trip_ended",
-            "tourist_id": current_user.id,
+            "tourist_id": user_id,
             "trip_id": trip_id,
-            "name": current_user.full_name,
-            "email": current_user.email,
-            "contact_number": current_user.contact_number,
-            "age": current_user.age,
-            "gender": current_user.gender
+            "name": user_full_name,
+            "email": user_email,
+            "contact_number": user_contact_number,
+            "age": user_age,
+            "gender": user_gender
         }
         await manager.broadcast_to_admins(json.dumps(trip_end_message))
         

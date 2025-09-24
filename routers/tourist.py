@@ -61,13 +61,16 @@ async def register_tourist(
         await db.commit()
         await db.refresh(new_user)
         
+        # Store user data to avoid detachment issues
+        user_id = new_user.id
+        
         # TODO: Update to new trip-based flow - should redirect to trip creation instead of auto-creating trip
         # Create initial trip profile for backward compatibility
         blockchain_id = Trip.generate_blockchain_id(name, get_tourist_place_by_id(location_id)["name"])
         tourist_place = get_tourist_place_by_id(location_id)
         
         new_trip = Trip(
-            user_id=new_user.id,
+            user_id=user_id,
             blockchain_id=blockchain_id,
             starting_location="Not specified",  # Placeholder - need trip creation form
             tourist_destination_id=location_id,
