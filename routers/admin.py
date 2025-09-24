@@ -5,11 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 
-from models import User, Trip, get_db
+from models import User, Trip, GuideLocation, get_db
 from schemas import TripData
 from services import get_tourist_place_by_id
 from auth import require_admin
 from config import INDIAN_TOURIST_PLACES
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -18,7 +19,8 @@ async def get_dashboard_data(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all active trips data for dashboard"""
+    """Get all active trips and guide locations data for dashboard"""
+    # Get active tourist trips
     result = await db.execute(select(Trip).filter(Trip.is_active == True))
     trips = result.scalars().all()
     trip_data = []
@@ -40,7 +42,41 @@ async def get_dashboard_data(
             "mode_of_travel": trip.mode_of_travel,
             "is_active": trip.is_active
         })
-    return trip_data
+    
+    # Get active guide locations (updated within last 10 minutes)
+    ten_minutes_ago = datetime.utcnow() - timedelta(minutes=10)
+    guide_result = await db.execute(
+        select(GuideLocation, User)
+        .join(User, GuideLocation.guide_id == User.id)
+        .filter(GuideLocation.updated_at > ten_minutes_ago)
+    )
+    guide_locations = guide_result.all()
+    
+    guide_data = []
+    for guide_location, guide_user in guide_locations:
+        # Count assigned tourists for this guide
+        assigned_trips_result = await db.execute(
+            select(Trip).filter(Trip.guide_id == guide_user.id, Trip.is_active == True)
+        )
+        assigned_count = len(assigned_trips_result.scalars().all())
+        
+        guide_data.append({
+            "id": guide_user.id,
+            "guide_name": guide_user.full_name,
+            "guide_email": guide_user.email,
+            "latitude": guide_location.latitude,
+            "longitude": guide_location.longitude,
+            "updated_at": guide_location.updated_at.isoformat(),
+            "assigned_tourist_count": assigned_count,
+            "status": "active"
+        })
+    
+    return {
+        "tourists": trip_data,
+        "guides": guide_data,
+        "total_tourists": len(trip_data),
+        "total_guides": len(guide_data)
+    }
 
 @router.get("/tourist-places")
 async def get_tourist_places():

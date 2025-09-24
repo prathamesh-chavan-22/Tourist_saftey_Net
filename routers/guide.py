@@ -3,11 +3,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from models import User, Trip, get_db
+from models import User, Trip, GuideLocation, get_db
 from auth import require_guide
 from services import get_tourist_place_by_id
+from schemas import GuideLocationUpdate
+from datetime import datetime
+import json
 
 router = APIRouter(prefix="/guide", tags=["guide"])
+
+# Connection manager will be set by main app
+manager = None
+
+def set_connection_manager(connection_manager):
+    """Set the WebSocket connection manager"""
+    global manager
+    manager = connection_manager
 
 @router.get("/dashboard")
 async def get_guide_dashboard_data(
@@ -54,4 +65,62 @@ async def get_guide_dashboard_data(
         "guide_email": current_user.email,
         "assigned_tourists": trip_data,
         "total_assigned": len(trip_data)
+    }
+
+@router.post("/update_location")
+async def update_guide_location(
+    location_data: GuideLocationUpdate,
+    current_user: User = Depends(require_guide),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update guide location and broadcast to appropriate users"""
+    # Validate coordinates
+    try:
+        location_data.validate_coordinates()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Check if guide already has a location record
+    result = await db.execute(
+        select(GuideLocation).filter(GuideLocation.guide_id == current_user.id)
+    )
+    guide_location = result.scalar_one_or_none()
+    
+    if guide_location:
+        # Update existing location using SQLAlchemy update
+        guide_location.latitude = location_data.latitude  # type: ignore
+        guide_location.longitude = location_data.longitude  # type: ignore
+        guide_location.updated_at = datetime.utcnow()  # type: ignore
+    else:
+        # Create new location record
+        guide_location = GuideLocation(
+            guide_id=current_user.id,
+            latitude=location_data.latitude,
+            longitude=location_data.longitude
+        )
+        db.add(guide_location)
+    
+    await db.commit()
+    await db.refresh(guide_location)
+    
+    # Prepare broadcast message
+    message_data = {
+        "type": "guide_location_update",
+        "guide_id": current_user.id,
+        "guide_name": current_user.full_name,
+        "latitude": location_data.latitude,
+        "longitude": location_data.longitude,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    # Broadcast to appropriate users (admin + assigned tourists)
+    if manager:
+        await manager.broadcast_guide_location_update(current_user.id, message_data)
+    
+    return {
+        "status": "success",
+        "message": "Guide location updated successfully",
+        "latitude": location_data.latitude,
+        "longitude": location_data.longitude,
+        "updated_at": guide_location.updated_at.isoformat()
     }

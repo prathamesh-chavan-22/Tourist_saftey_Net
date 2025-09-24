@@ -104,6 +104,36 @@ class ConnectionManager:
             if connection in self.active_connections:
                 self.active_connections.remove(connection)
 
+    async def broadcast_guide_location_update(self, guide_id: int, guide_data: dict):
+        """
+        Broadcast guide location update with role-based filtering:
+        - Admin users: receive all guide location updates
+        - Tourist users: only receive their assigned guide's location updates
+        - Guide users: do NOT receive other guides' locations (privacy)
+        """
+        message = json.dumps(guide_data)
+        connections_to_remove = []
+        
+        # Send to all admin users (they see all guides)
+        await self.broadcast_to_admins(message)
+        
+        # Send to tourists who have this guide assigned to their active trip
+        for connection in self.active_connections.copy():
+            if str(connection.user.role) == "tourist":
+                # Check if this tourist has an active trip with the specific guide
+                if (connection.trip is not None and 
+                    connection.trip.guide_id is not None and
+                    int(str(connection.trip.guide_id)) == guide_id):
+                    try:
+                        await connection.websocket.send_text(message)
+                    except Exception as e:
+                        connections_to_remove.append(connection)
+        
+        # Remove disconnected connections
+        for connection in connections_to_remove:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
+
     async def broadcast(self, message: str):
         """Legacy broadcast method - sends to all connections (deprecated for security)"""
         connections_to_remove = []

@@ -91,6 +91,22 @@ class Incident(Base):
     # Relationship to trip
     trip = relationship("Trip", back_populates="incidents")
 
+class GuideLocation(Base):
+    __tablename__ = "guide_locations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    guide_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship to guide user
+    guide = relationship("User", foreign_keys=[guide_id])
+    
+    def __repr__(self):
+        return f"<GuideLocation(guide_id={self.guide_id}, lat={self.latitude}, lon={self.longitude}, updated_at={self.updated_at})>"
+
 # Database configuration
 import os
 

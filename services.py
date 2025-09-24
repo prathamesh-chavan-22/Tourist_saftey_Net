@@ -73,6 +73,21 @@ async def create_demo_users():
                 db.add(tourist_user)
                 # Note: Trip will be created when user starts a trip, not automatically
             
+            # Check if demo guide exists  
+            result = await db.execute(select(User).filter(User.email == "guide@demo.com"))
+            guide_exists = result.scalar_one_or_none()
+            if not guide_exists:
+                guide_user = User(
+                    email="guide@demo.com",
+                    hashed_password=User.get_password_hash("guide123"),
+                    full_name="Demo Guide",
+                    contact_number="+1234567892",
+                    age=28,
+                    gender="M",
+                    role="guide"
+                )
+                db.add(guide_user)
+            
             await db.commit()
         except Exception as e:
             print(f"Error creating demo users: {e}")

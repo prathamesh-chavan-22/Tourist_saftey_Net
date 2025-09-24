@@ -26,18 +26,56 @@ touristPlaces.forEach(place => {
     }).addTo(map).bindPopup(`<b>${place.name}</b><br>Safe Zone: ${place.radius}m radius`);
 });
 
-// Add tourist markers - this will be populated by template data
+// Add tourist and guide markers - this will be populated by template data
 const touristMarkers = {};
+const guideMarkers = {};
+
+// Create custom icons for different marker types
+const touristIcon = L.divIcon({
+    html: '<div style="background: #007BFF; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">T</div>',
+    className: 'custom-div-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+});
+
+const guideIcon = L.divIcon({
+    html: '<div style="background: #6C5CE7; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">G</div>',
+    className: 'custom-div-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+});
+
+// Create layer groups for tourists and guides
+const touristLayer = L.layerGroup().addTo(map);
+const guideLayer = L.layerGroup().addTo(map);
+
+// Layer control
+const overlayMaps = {
+    "Tourists": touristLayer,
+    "Guides": guideLayer
+};
+L.control.layers(null, overlayMaps).addTo(map);
 
 // Function to initialize tourist markers from template data
 function initializeTouristMarkers(tourists) {
     tourists.forEach(tourist => {
-        const marker = L.marker([tourist.last_lat, tourist.last_lon])
-            .addTo(map)
-            .bindPopup(`<b>${tourist.name}</b><br>Status: ${tourist.status}`);
+        const marker = L.marker([tourist.last_lat, tourist.last_lon], {icon: touristIcon})
+            .addTo(touristLayer)
+            .bindPopup(`<b>${tourist.name}</b><br>Status: ${tourist.status}<br>Trip ID: ${tourist.trip_id}`);
         // Use tourist.id but store it as the same key that WebSocket updates will use
         touristMarkers[tourist.id] = marker;
-        console.log(`Initialized marker for tourist ID: ${tourist.id}`);
+        console.log(`Initialized tourist marker for ID: ${tourist.id}`);
+    });
+}
+
+// Function to initialize guide markers from template data
+function initializeGuideMarkers(guides) {
+    guides.forEach(guide => {
+        const marker = L.marker([guide.last_lat, guide.last_lon], {icon: guideIcon})
+            .addTo(guideLayer)
+            .bindPopup(`<b>${guide.name}</b><br>Role: Guide<br>Assigned Tourists: ${guide.assigned_tourist_count}<br>Updated: ${new Date(guide.updated_at).toLocaleTimeString()}`);
+        guideMarkers[guide.id] = marker;
+        console.log(`Initialized guide marker for ID: ${guide.id}`);
     });
 }
 
@@ -63,6 +101,9 @@ function initializeDashboardWebSocket() {
         } else if (data.type === 'tourist_status_change') {
             console.log('Tourist status change:', data);
             handleTouristStatusChange(data);
+        } else if (data.type === 'guide_location_update') {
+            console.log('Updating guide location on dashboard:', data);
+            updateGuideOnMap(data);
         }
     };
 
@@ -86,12 +127,29 @@ initializeDashboardWebSocket();
 function updateTouristOnMap(data) {
     if (touristMarkers[data.tourist_id]) {
         touristMarkers[data.tourist_id].setLatLng([data.latitude, data.longitude]);
-        touristMarkers[data.tourist_id].setPopupContent(`<b>${data.name}</b><br>Status: ${data.status}`);
+        touristMarkers[data.tourist_id].setPopupContent(`<b>${data.name}</b><br>Status: ${data.status}<br>Trip ID: ${data.trip_id}`);
     } else {
-        const marker = L.marker([data.latitude, data.longitude])
-            .addTo(map)
-            .bindPopup(`<b>${data.name}</b><br>Status: ${data.status}`);
+        const marker = L.marker([data.latitude, data.longitude], {icon: touristIcon})
+            .addTo(touristLayer)
+            .bindPopup(`<b>${data.name}</b><br>Status: ${data.status}<br>Trip ID: ${data.trip_id}`);
         touristMarkers[data.tourist_id] = marker;
+    }
+}
+
+function updateGuideOnMap(data) {
+    if (guideMarkers[data.guide_id]) {
+        // Update existing guide marker
+        guideMarkers[data.guide_id].setLatLng([data.latitude, data.longitude]);
+        guideMarkers[data.guide_id].setPopupContent(
+            `<b>${data.guide_name}</b><br>Role: Guide<br>Updated: ${new Date(data.timestamp).toLocaleTimeString()}`
+        );
+    } else {
+        // Create new guide marker
+        const marker = L.marker([data.latitude, data.longitude], {icon: guideIcon})
+            .addTo(guideLayer)
+            .bindPopup(`<b>${data.guide_name}</b><br>Role: Guide<br>Updated: ${new Date(data.timestamp).toLocaleTimeString()}`);
+        guideMarkers[data.guide_id] = marker;
+        console.log(`Added new guide marker for ID: ${data.guide_id}`);
     }
 }
 

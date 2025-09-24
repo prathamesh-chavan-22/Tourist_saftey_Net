@@ -311,11 +311,15 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script>
-        // Initialize tourist markers with template data (only active tourists)
+        // Initialize tourist and guide markers with template data
         const activeTourists = {{ active_tourists|tojson }};
+        const activeGuides = {{ active_guides|tojson }};
         
         // Initialize tourist markers from template data
         initializeTouristMarkers(activeTourists);
+        
+        // Initialize guide markers from template data  
+        initializeGuideMarkers(activeGuides);
         
         // Add mobile-friendly enhancements
         document.addEventListener('DOMContentLoaded', function() {

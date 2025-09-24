@@ -30,9 +30,11 @@ templates = Jinja2Templates(directory="templates")
 # WebSocket connection manager
 manager = ConnectionManager()
 
-# Set connection manager for tourist router
-from routers.tourist import set_connection_manager
-set_connection_manager(manager)
+# Set connection manager for tourist and guide routers
+from routers.tourist import set_connection_manager as set_tourist_manager
+from routers.guide import set_connection_manager as set_guide_manager
+set_tourist_manager(manager)
+set_guide_manager(manager)
 
 # Include routers
 app.include_router(auth_router)
@@ -524,10 +526,41 @@ async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
             })
             inactive_tourists.append(tourist_data)
     
+    # Get active guide locations (updated within last 10 minutes)
+    from datetime import datetime, timedelta
+    from models import GuideLocation
+    ten_minutes_ago = datetime.utcnow() - timedelta(minutes=10)
+    guide_result = await db.execute(
+        select(GuideLocation, User)
+        .join(User, GuideLocation.guide_id == User.id)
+        .filter(GuideLocation.updated_at > ten_minutes_ago)
+    )
+    guide_locations = guide_result.all()
+    
+    active_guides = []
+    for guide_location, guide_user in guide_locations:
+        # Count assigned tourists for this guide
+        assigned_trips_result = await db.execute(
+            select(Trip).filter(Trip.guide_id == guide_user.id, Trip.is_active == True)
+        )
+        assigned_count = len(assigned_trips_result.scalars().all())
+        
+        active_guides.append({
+            "id": guide_user.id,
+            "name": guide_user.full_name,
+            "email": guide_user.email,
+            "last_lat": guide_location.latitude,
+            "last_lon": guide_location.longitude,
+            "updated_at": guide_location.updated_at.isoformat(),
+            "assigned_tourist_count": assigned_count,
+            "status": "active"
+        })
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
         "active_tourists": active_tourists,
         "inactive_tourists": inactive_tourists,
+        "active_guides": active_guides,
         "geofence": GEOFENCE_CENTER
     })
 

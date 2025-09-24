@@ -6,6 +6,13 @@ The system uses a simple rule-based AI approach where tourists are classified as
 
 ## Recent Changes
 
+**September 24, 2025** - Guide Demo Account & Database Schema Fix:
+- **Demo Guide Account**: Added complete demo guide account (guide@demo.com / guide123) to system initialization
+- **Database Schema Synchronization**: Fixed critical "column trips.guide_id does not exist" error by adding missing database column
+- **Enhanced Login Interface**: Updated login page to display guide demo credentials and registration link
+- **Database Migration Repair**: Added guide_id column and foreign key constraint to trips table for proper guide-trip relationships
+- **Complete Guide Accessibility**: Guides are no longer "ghost" accounts - fully accessible through demo login and registration
+
 **September 24, 2025** - Comprehensive Guide Role System Implementation:
 - **Guide Role Authentication**: Implemented complete guide role system with proper access controls and authentication
 - **Guide Dashboard**: Created dedicated guide dashboard at `/guide-dashboard` with purple theme showing only assigned tourists
