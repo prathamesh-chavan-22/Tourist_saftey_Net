@@ -4,7 +4,7 @@ import math
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from models import User, Tourist, AsyncSessionLocal
+from models import User, Trip, AsyncSessionLocal
 from config import INDIAN_TOURIST_PLACES
 
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -50,6 +50,9 @@ async def create_demo_users():
                     email="admin@demo.com",
                     hashed_password=User.get_password_hash("admin123"),
                     full_name="Admin User",
+                    contact_number="+1234567890",
+                    age=30,
+                    gender="M",
                     role="admin"
                 )
                 db.add(admin_user)
@@ -62,25 +65,13 @@ async def create_demo_users():
                     email="tourist@demo.com",
                     hashed_password=User.get_password_hash("tourist123"),
                     full_name="Demo Tourist",
+                    contact_number="+1234567891",
+                    age=25,
+                    gender="F",
                     role="tourist"
                 )
                 db.add(tourist_user)
-                await db.commit()
-                await db.refresh(tourist_user)
-                
-                # Create tourist profile for demo tourist  
-                blockchain_id = Tourist.generate_blockchain_id("Demo Tourist")
-                tourist_place = {"lat": 27.1751, "lon": 78.0421}  # Default Taj Mahal coordinates
-                
-                demo_tourist = Tourist(
-                    user_id=tourist_user.id,
-                    name="Demo Tourist",
-                    blockchain_id=blockchain_id,
-                    location_id=1,
-                    last_lat=tourist_place["lat"],
-                    last_lon=tourist_place["lon"]
-                )
-                db.add(demo_tourist)
+                # Note: Trip will be created when user starts a trip, not automatically
             
             await db.commit()
         except Exception as e:

@@ -155,12 +155,12 @@
     <div class="header">
         <div class="header-left">
             <h1>🇮🇳 Tourist Safety Dashboard</h1>
-            <p>Real-time location monitoring at {{ tourist.location_name }}</p>
+            <p>Tourist Safety Dashboard</p>
         </div>
         <div class="header-right">
             <div class="user-info">
                 <div><strong>{{ user.full_name }}</strong></div>
-                <div style="font-size: 12px; opacity: 0.8;">Tourist ID: {{ tourist.id }}</div>
+                <div style="font-size: 12px; opacity: 0.8;">User: {{ user.email }}</div>
             </div>
             <form method="post" action="/auth/logout" style="margin: 0;">
                 <button type="submit" class="logout-btn">Logout</button>
@@ -168,22 +168,34 @@
         </div>
     </div>
 
+    {% if message %}
+    <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        {{ message }}
+    </div>
+    {% endif %}
+    
+    {% if error %}
+    <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        {{ error }}
+    </div>
+    {% endif %}
+
     <div class="status-panel">
         <div class="status-item">
             <h3>Current Status</h3>
-            <div id="status" class="status-value status-{{ tourist.status|lower }}">{{ tourist.status }}</div>
+            {% if active_trip %}<div id="status" class="status-value status-{{ active_trip.status|lower }}">{{ active_trip.status }}</div>{% else %}<div class="status-value">No Active Trip</div>{% endif %}
         </div>
         <div class="status-item">
             <h3>Location</h3>
-            <div id="coordinates" class="status-value">{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</div>
+            {% if active_trip %}<div id="coordinates" class="status-value">{{ "%.4f"|format(active_trip.last_lat) }}, {{ "%.4f"|format(active_trip.last_lon) }}</div>{% else %}<div class="status-value">-</div>{% endif %}
         </div>
         <div class="status-item">
             <h3>Tourist Site</h3>
-            <div class="status-value">{{ tourist.location_name }}</div>
+            {% if active_trip %}<div class="status-value">{{ active_trip.tourist_destination_name }}</div>{% else %}<div class="status-value">-</div>{% endif %}
         </div>
         <div class="status-item">
             <h3>Blockchain ID</h3>
-            <div class="status-value" style="font-size: 12px;">{{ tourist.blockchain_id[:12] }}...</div>
+            {% if active_trip %}<div class="status-value" style="font-size: 12px;">{{ active_trip.blockchain_id[:12] }}...</div>{% else %}<div class="status-value">-</div>{% endif %}
         </div>
     </div>
 
@@ -205,6 +217,12 @@
             </div>
 
             <div class="info-section">
+                {% if active_trip %}
+                <h4>🎮 Trip Controls</h4>
+                <form method="post" action="/close-trip" style="margin: 10px 0;">
+                    <input type="hidden" name="trip_id" value="{{ active_trip.id }}">
+                    <button type="submit" class="logout-btn" style="background: #dc3545; width: 100%;" onclick="return confirm('Are you sure you want to close this trip?')">Close Current Trip</button>
+                </form>
                 <h4>📍 How It Works</h4>
                 <ul>
                     <li><strong>Green Status:</strong> You're in the safe zone</li>
@@ -212,18 +230,48 @@
                     <li><strong>Movement:</strong> Use arrow keys or buttons to move</li>
                     <li><strong>Real-time:</strong> Your status updates automatically</li>
                 </ul>
+                {% else %}
+                <h4>🎯 Trip Management</h4>
+                <a href="/create-trip" class="logout-btn" style="background: #28a745; text-decoration: none; display: block; text-align: center; margin: 10px 0;">Create New Trip</a>
+                <p>You don't have an active trip. Create one to start location tracking!</p>
+                {% endif %}
             </div>
 
             <div id="statusAlert" class="alert"></div>
+        </div>
+        
+        <div class="controls-panel">
+            <h3>📋 Past Trips</h3>
+            {% if past_trips %}
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
+                {% for trip in past_trips %}
+                <div style="border-bottom: 1px solid #eee; padding: 8px 0; font-size: 14px;">
+                    <strong>{{ trip.tourist_destination_name }}</strong><br>
+                    <span style="color: #666;">From: {{ trip.starting_location }}</span><br>
+                    <span style="color: #666;">Travel: {{ trip.mode_of_travel }}</span><br>
+                    <span style="color: #666;">Created: {{ trip.created_at.strftime('%Y-%m-%d') }}</span>
+                    {% if trip.closed_at %}<br><span style="color: #666;">Closed: {{ trip.closed_at.strftime('%Y-%m-%d') }}</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="font-size: 14px; color: #666; text-align: center; padding: 20px;">No past trips yet.</p>
+            {% endif %}
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Current tourist data
-        let currentLat = {{ tourist.last_lat }};
-        let currentLon = {{ tourist.last_lon }};
-        const touristId = {{ tourist.id }};
+        {% if active_trip %}
+        let currentLat = {{ active_trip.last_lat }};
+        let currentLon = {{ active_trip.last_lon }};
+        const tripId = {{ active_trip.id }};
+        {% else %}
+        let currentLat = {{ geofence.center_lat }};
+        let currentLon = {{ geofence.center_lon }};
+        const tripId = null;
+        {% endif %}
 
         // Initialize map
         const map = L.map('map').setView([currentLat, currentLon], 16);
@@ -252,6 +300,13 @@
                 iconAnchor: [15, 15]
             })
         }).addTo(map).bindPopup('{{ user.full_name }}');
+        
+        {% if not active_trip %}
+        // Disable movement if no active trip
+        function showNoTripAlert() {
+            showAlert('No active trip! Create a trip first to use movement controls.', 'warning');
+        }
+        {% endif %}
 
         // WebSocket connection for live updates
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -260,7 +315,7 @@
         
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
-            if (data.type === 'location_update' && data.tourist_id === touristId) {
+            if (data.type === 'location_update' && data.trip_id === tripId) {
                 updateLocation(data.latitude, data.longitude, data.status);
                 showAlert(data.inside_fence ? 'You are in the safe zone!' : 'Warning: You have left the safe zone!', 
                          data.inside_fence ? 'success' : 'warning');
@@ -313,7 +368,7 @@
                         'Authorization': `Bearer ${getCookie('access_token')}`
                     },
                     body: JSON.stringify({
-                        tourist_id: touristId,
+                        trip_id: tripId,
                         latitude: newLat,
                         longitude: newLon
                     })

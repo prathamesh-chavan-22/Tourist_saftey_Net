@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 
-from models import Tourist, User, get_db, create_tables
+from models import Trip, User, get_db, create_tables
 from services import create_demo_users, get_tourist_place_by_id
 from websocket_manager import ConnectionManager
 from config import INDIAN_TOURIST_PLACES, GEOFENCE_CENTER, get_allowed_origins
@@ -41,22 +41,24 @@ app.include_router(tourist_router)
 async def get_dashboard_data_legacy(
     db: AsyncSession = Depends(get_db)
 ):
-    """Legacy dashboard endpoint - returns tourist data for backwards compatibility"""
-    result = await db.execute(select(Tourist))
-    tourists = result.scalars().all()
-    return [
-        {
-            "id": tourist.id,
-            "name": tourist.name,
-            "blockchain_id": tourist.blockchain_id,
-            "last_lat": tourist.last_lat,
-            "last_lon": tourist.last_lon,
-            "status": tourist.status,
-            "location_id": tourist.location_id,
-            "location_name": get_tourist_place_by_id(int(str(tourist.location_id)))["name"]
-        }
-        for tourist in tourists
-    ]
+    """Legacy dashboard endpoint - returns active trip data for backwards compatibility"""
+    result = await db.execute(select(Trip).filter(Trip.is_active == True))
+    trips = result.scalars().all()
+    trip_data = []
+    for trip in trips:
+        user_result = await db.execute(select(User).filter(User.id == trip.user_id))
+        user = user_result.scalar_one_or_none()
+        trip_data.append({
+            "id": trip.id,
+            "user_name": user.full_name if user else "Unknown",
+            "blockchain_id": trip.blockchain_id,
+            "last_lat": trip.last_lat,
+            "last_lon": trip.last_lon,
+            "status": trip.status,
+            "tourist_destination_id": trip.tourist_destination_id,
+            "tourist_destination_name": get_tourist_place_by_id(int(str(trip.tourist_destination_id)))["name"]
+        })
+    return trip_data
 
 @app.get("/tourist-places")
 async def get_tourist_places_legacy():
@@ -138,14 +140,14 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
             await websocket.close(code=1008, reason="Authentication required")
             return
         
-        # Get tourist data if user is a tourist
-        tourist = None
+        # Get active trip data if user is a tourist
+        trip = None
         if str(user.role) == "tourist":
-            result = await db.execute(select(Tourist).filter(Tourist.user_id == user.id))
-            tourist = result.scalar_one_or_none()
+            result = await db.execute(select(Trip).filter(Trip.user_id == user.id, Trip.is_active == True))
+            trip = result.scalar_one_or_none()
         
         # Connect with authenticated user
-        await manager.connect(websocket, user, tourist)
+        await manager.connect(websocket, user, trip)
         
         try:
             while True:
@@ -182,8 +184,8 @@ async def register_page(request: Request, error: Optional[str] = None):
     })
 
 @app.get("/tourist-dashboard", response_class=HTMLResponse)
-async def tourist_dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
-    """Tourist dashboard page - shows only their own data"""
+async def tourist_dashboard_page(request: Request, message: Optional[str] = None, error: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    """Tourist dashboard page - shows user info, trips, and management options"""
     # Try to get current user, redirect to login if not authenticated
     current_user = await get_user_from_cookie_token(
         request.cookies.get("access_token"), db
@@ -194,50 +196,191 @@ async def tourist_dashboard_page(request: Request, db: AsyncSession = Depends(ge
     if str(current_user.role) != "tourist":
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     
-    # Get tourist data for this user
-    result = await db.execute(select(Tourist).filter(Tourist.user_id == current_user.id))
-    tourist = result.scalar_one_or_none()
-    if not tourist:
-        # Create tourist profile if it doesn't exist
-        tourist_place = get_tourist_place_by_id(1)  # Default to Taj Mahal
-        blockchain_id = Tourist.generate_blockchain_id(str(current_user.full_name))
-        
-        tourist = Tourist(
-            user_id=current_user.id,
-            name=str(current_user.full_name),
-            blockchain_id=blockchain_id,
-            location_id=1,
-            last_lat=tourist_place["lat"],
-            last_lon=tourist_place["lon"]
-        )
-        
-        db.add(tourist)
-        await db.commit()
-        await db.refresh(tourist)
+    # Get all trips for this user (both active and past)
+    all_trips_result = await db.execute(select(Trip).filter(Trip.user_id == current_user.id).order_by(Trip.created_at.desc()))
+    all_trips = all_trips_result.scalars().all()
     
-    tourist_place = get_tourist_place_by_id(int(str(tourist.location_id)))
-    tourist_data = {
-        "id": tourist.id,
-        "name": tourist.name,
-        "blockchain_id": tourist.blockchain_id,
-        "last_lat": tourist.last_lat,
-        "last_lon": tourist.last_lon,
-        "status": tourist.status,
-        "location_id": tourist.location_id,
-        "location_name": tourist_place["name"]
-    }
+    # Get active trip data for this user
+    active_trip = None
+    past_trips = []
     
-    return templates.TemplateResponse("tourist_dashboard.html", {
-        "request": request,
-        "user": current_user,
-        "tourist": tourist_data,
-        "geofence": {
+    for trip in all_trips:
+        tourist_place = get_tourist_place_by_id(int(str(trip.tourist_destination_id)))
+        trip_data = {
+            "id": trip.id,
+            "blockchain_id": trip.blockchain_id,
+            "starting_location": trip.starting_location,
+            "last_lat": trip.last_lat,
+            "last_lon": trip.last_lon,
+            "status": trip.status,
+            "tourist_destination_id": trip.tourist_destination_id,
+            "tourist_destination_name": tourist_place["name"],
+            "hotels": trip.hotels,
+            "mode_of_travel": trip.mode_of_travel,
+            "is_active": trip.is_active,
+            "created_at": trip.created_at,
+            "closed_at": trip.closed_at
+        }
+        
+        if bool(trip.is_active):
+            active_trip = trip_data
+        else:
+            past_trips.append(trip_data)
+    
+    # Set up geofence data for active trip, or default to first tourist place
+    geofence_data = {"center_lat": 28.6129, "center_lon": 77.2295, "radius": 400, "name": "Default Location"}
+    if active_trip:
+        tourist_place = get_tourist_place_by_id(int(str(active_trip["tourist_destination_id"])))
+        geofence_data = {
             "center_lat": tourist_place["lat"],
             "center_lon": tourist_place["lon"],
             "radius": tourist_place["radius"],
             "name": tourist_place["name"]
         }
+    
+    return templates.TemplateResponse("tourist_dashboard.html", {
+        "request": request,
+        "user": current_user,
+        "active_trip": active_trip,
+        "past_trips": past_trips,
+        "tourist_places": INDIAN_TOURIST_PLACES,
+        "geofence": geofence_data,
+        "message": message,
+        "error": error
     })
+
+@app.get("/create-trip", response_class=HTMLResponse)
+async def create_trip_page(request: Request, db: AsyncSession = Depends(get_db)):
+    """Create trip page for tourists"""
+    # Try to get current user, redirect to login if not authenticated
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    
+    if str(current_user.role) != "tourist":
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    
+    # Check if user already has an active trip
+    result = await db.execute(select(Trip).filter(Trip.user_id == current_user.id, Trip.is_active == True))
+    active_trip = result.scalar_one_or_none()
+    if active_trip:
+        return RedirectResponse(url="/tourist-dashboard?message=You already have an active trip", status_code=status.HTTP_302_FOUND)
+    
+    return templates.TemplateResponse("create_trip.html", {
+        "request": request,
+        "user": current_user,
+        "tourist_places": INDIAN_TOURIST_PLACES
+    })
+
+@app.post("/create-trip")
+async def create_trip_submit(
+    request: Request,
+    starting_location: str = Form(...),
+    tourist_destination_id: int = Form(...),
+    mode_of_travel: str = Form(...),
+    hotels: str = Form(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle trip creation form submission"""
+    # Try to get current user, redirect to login if not authenticated
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    
+    if str(current_user.role) != "tourist":
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    
+    try:
+        # Check if user already has an active trip
+        result = await db.execute(select(Trip).filter(Trip.user_id == current_user.id, Trip.is_active == True))
+        active_trip = result.scalar_one_or_none()
+        if active_trip:
+            return RedirectResponse(url="/tourist-dashboard?error=You already have an active trip", status_code=status.HTTP_302_FOUND)
+        
+        # Create the new trip
+        tourist_place = get_tourist_place_by_id(tourist_destination_id)
+        blockchain_id = Trip.generate_blockchain_id(str(current_user.full_name), tourist_place["name"])
+        
+        new_trip = Trip(
+            user_id=current_user.id,
+            blockchain_id=blockchain_id,
+            starting_location=starting_location,
+            tourist_destination_id=tourist_destination_id,
+            hotels=hotels,
+            mode_of_travel=mode_of_travel,
+            last_lat=tourist_place["lat"],
+            last_lon=tourist_place["lon"]
+        )
+        
+        db.add(new_trip)
+        await db.commit()
+        await db.refresh(new_trip)
+        
+        # Redirect to dashboard with success message
+        return RedirectResponse(url="/tourist-dashboard?message=Trip created successfully!", status_code=status.HTTP_302_FOUND)
+        
+    except Exception as e:
+        # Handle any errors during trip creation
+        return templates.TemplateResponse("create_trip.html", {
+            "request": request,
+            "user": current_user,
+            "tourist_places": INDIAN_TOURIST_PLACES,
+            "error": f"Error creating trip: {str(e)}"
+        })
+
+@app.post("/close-trip")
+async def close_trip(
+    request: Request,
+    trip_id: int = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle trip closure form submission"""
+    # Try to get current user, redirect to login if not authenticated
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    
+    if str(current_user.role) != "tourist":
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    
+    try:
+        # Get the trip to close
+        result = await db.execute(
+            select(Trip).filter(
+                Trip.id == trip_id, 
+                Trip.user_id == current_user.id, 
+                Trip.is_active == True
+            )
+        )
+        trip = result.scalar_one_or_none()
+        
+        if not trip:
+            return RedirectResponse(url="/tourist-dashboard?error=Trip not found or already closed", status_code=status.HTTP_302_FOUND)
+        
+        # Close the trip using SQLAlchemy update
+        from datetime import datetime
+        from sqlalchemy import update
+        
+        await db.execute(
+            update(Trip)
+            .where(Trip.id == trip_id)
+            .values(is_active=False, closed_at=datetime.utcnow())
+        )
+        
+        await db.commit()
+        
+        # Redirect to dashboard with success message
+        return RedirectResponse(url="/tourist-dashboard?message=Trip closed successfully!", status_code=status.HTTP_302_FOUND)
+        
+    except Exception as e:
+        # Handle any errors during trip closure
+        return RedirectResponse(url="/tourist-dashboard?error=Error closing trip: " + str(e), status_code=status.HTTP_302_FOUND)
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
@@ -253,36 +396,72 @@ async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
     if str(current_user.role) != "admin":
         return RedirectResponse(url="/tourist-dashboard", status_code=status.HTTP_302_FOUND)
     
-    result = await db.execute(select(Tourist))
-    tourists = result.scalars().all()
-    # Enrich tourists with location names
-    tourists_data = []
-    for tourist in tourists:
-        tourist_place = get_tourist_place_by_id(int(str(tourist.location_id)))
-        tourists_data.append({
+    # Get all tourist users
+    tourists_result = await db.execute(select(User).filter(User.role == "tourist"))
+    all_tourists = tourists_result.scalars().all()
+    
+    # Get all active trips
+    active_trips_result = await db.execute(select(Trip).filter(Trip.is_active == True))
+    active_trips = active_trips_result.scalars().all()
+    
+    # Create mapping of user_id to active trip
+    user_to_active_trip = {}
+    for trip in active_trips:
+        user_to_active_trip[trip.user_id] = trip
+    
+    # Categorize tourists
+    active_tourists = []  # Tourists with active trips (for map)
+    inactive_tourists = []  # Tourists without active trips (for list)
+    
+    for tourist in all_tourists:
+        tourist_data = {
             "id": tourist.id,
-            "name": tourist.name,
-            "blockchain_id": tourist.blockchain_id,
-            "last_lat": tourist.last_lat,
-            "last_lon": tourist.last_lon,
-            "status": tourist.status,
-            "location_id": tourist.location_id,
-            "location_name": tourist_place["name"]
-        })
+            "name": tourist.full_name,
+            "email": tourist.email,
+            "contact_number": tourist.contact_number,
+            "age": tourist.age,
+            "gender": tourist.gender
+        }
+        
+        if tourist.id in user_to_active_trip:
+            trip = user_to_active_trip[tourist.id]
+            tourist_place = get_tourist_place_by_id(int(str(trip.tourist_destination_id)))
+            
+            tourist_data.update({
+                "trip_id": trip.id,
+                "blockchain_id": trip.blockchain_id,
+                "starting_location": trip.starting_location,
+                "last_lat": trip.last_lat,
+                "last_lon": trip.last_lon,
+                "status": trip.status,
+                "tourist_destination_id": trip.tourist_destination_id,
+                "location_name": tourist_place["name"],
+                "hotels": trip.hotels,
+                "mode_of_travel": trip.mode_of_travel,
+                "has_active_trip": True
+            })
+            active_tourists.append(tourist_data)
+        else:
+            tourist_data.update({
+                "has_active_trip": False,
+                "status": "No Active Trip"
+            })
+            inactive_tourists.append(tourist_data)
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
-        "tourists": tourists_data,
+        "active_tourists": active_tourists,
+        "inactive_tourists": inactive_tourists,
         "geofence": GEOFENCE_CENTER
     })
 
-@app.get("/tourist/{tourist_id}", response_class=HTMLResponse)
-async def tourist_map_page(
-    tourist_id: int, 
+@app.get("/trip/{trip_id}", response_class=HTMLResponse)
+async def trip_map_page(
+    trip_id: int, 
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Tourist map page with arrow key controls"""
+    """Trip map page with arrow key controls"""
     # Try to get current user, redirect to login if not authenticated
     current_user = await get_user_from_cookie_token(
         request.cookies.get("access_token"), db
@@ -290,24 +469,24 @@ async def tourist_map_page(
     if not current_user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     
-    result = await db.execute(select(Tourist).filter(Tourist.id == tourist_id))
-    tourist = result.scalar_one_or_none()
-    if not tourist:
-        raise HTTPException(status_code=404, detail="Tourist not found")
+    result = await db.execute(select(Trip).filter(Trip.id == trip_id))
+    trip = result.scalar_one_or_none()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
     
-    # Check if user has permission to view this tourist's map
-    if str(current_user.role) == "tourist" and int(str(tourist.user_id)) != current_user.id:
+    # Check if user has permission to view this trip's map
+    if str(current_user.role) == "tourist" and int(str(trip.user_id)) != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your own tourist map"
+            detail="You can only view your own trip map"
         )
     
-    # Get the tourist's assigned location geofence
-    tourist_place = get_tourist_place_by_id(int(str(tourist.location_id)))
+    # Get the trip's destination geofence
+    tourist_place = get_tourist_place_by_id(int(str(trip.tourist_destination_id)))
     
     return templates.TemplateResponse("map.html", {
         "request": request,
-        "tourist": tourist,
+        "trip": trip,
         "current_user": current_user,  # Pass current user to template
         "geofence": {
             "center_lat": tourist_place["lat"],

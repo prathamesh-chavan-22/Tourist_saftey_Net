@@ -6,6 +6,49 @@
     <title>Tourist Safety Dashboard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/static/css/dashboard.css" />
+    <style>
+        .status-inactive {
+            color: #6c757d;
+            font-weight: bold;
+        }
+        .tourist-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .tourist-table th, .tourist-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .tourist-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .tourist-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .tourist-link {
+            color: #007bff;
+            text-decoration: none;
+            padding: 4px 8px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .tourist-link:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .status-safe {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-critical {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -30,12 +73,13 @@
 
     <div class="dashboard">
         <div class="tourists-panel">
-            <h3>📋 Tourists Status</h3>
-            <table class="tourist-table" id="touristsTable">
+            <h3>📋 Active Tourists ({{ active_tourists|length }})</h3>
+            {% if active_tourists %}
+            <table class="tourist-table" id="activeTouristsTable">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>ID</th>
+                        <th>Trip ID</th>
                         <th>Tourist Site</th>
                         <th>Status</th>
                         <th>Coordinates</th>
@@ -43,24 +87,55 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for tourist in tourists %}
+                    {% for tourist in active_tourists %}
                     <tr data-tourist-id="{{ tourist.id }}">
                         <td>{{ tourist.name }}</td>
-                        <td>{{ tourist.id }}</td>
+                        <td>{{ tourist.trip_id }}</td>
                         <td>{{ tourist.location_name }}</td>
                         <td class="status-{{ tourist.status|lower }}">{{ tourist.status }}</td>
                         <td>{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</td>
                         <td>
-                            <a href="/tourist/{{ tourist.id }}" class="tourist-link">View Map</a>
+                            <a href="/trip/{{ tourist.trip_id }}" class="tourist-link">View Map</a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            {% else %}
+            <p style="text-align: center; color: #666; padding: 20px;">No active tourists currently</p>
+            {% endif %}
+            
+            <h3 style="margin-top: 30px;">👥 Inactive Tourists ({{ inactive_tourists|length }})</h3>
+            {% if inactive_tourists %}
+            <table class="tourist-table" id="inactiveTouristsTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Contact</th>
+                        <th>Age</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tourist in inactive_tourists %}
+                    <tr data-tourist-id="{{ tourist.id }}">
+                        <td>{{ tourist.name }}</td>
+                        <td>{{ tourist.email }}</td>
+                        <td>{{ tourist.contact_number }}</td>
+                        <td>{{ tourist.age }}</td>
+                        <td class="status-inactive">{{ tourist.status }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="text-align: center; color: #666; padding: 20px;">All tourists have active trips</p>
+            {% endif %}
         </div>
 
         <div class="map-panel">
-            <h3>🗺️ Overview Map</h3>
+            <h3>🗺️ Active Tourists Location Map</h3>
             <div id="map"></div>
         </div>
     </div>
@@ -69,21 +144,11 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script>
-        // Initialize tourist markers with template data
-        const tourists = [
-            {% for tourist in tourists %}
-            {
-                id: {{ tourist.id }},
-                name: "{{ tourist.name }}",
-                last_lat: {{ tourist.last_lat }},
-                last_lon: {{ tourist.last_lon }},
-                status: "{{ tourist.status }}"
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ];
+        // Initialize tourist markers with template data (only active tourists)
+        const activeTourists = {{ active_tourists|tojson }};
         
         // Initialize tourist markers from template data
-        initializeTouristMarkers(tourists);
+        initializeTouristMarkers(activeTourists);
     </script>
 </body>
 </html>

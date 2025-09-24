@@ -18,12 +18,15 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
+    contact_number = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    gender = Column(String, nullable=False)  # 'M' or 'F'
     role = Column(String, nullable=False, default="tourist")  # admin or tourist
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Relationship to tourist (one-to-one)
-    tourist = relationship("Tourist", back_populates="user", uselist=False)
+    # Relationship to trips (one-to-many)
+    trips = relationship("Trip", back_populates="user")
     
     def verify_password(self, password: str) -> bool:
         """Verify password against hashed password"""
@@ -34,32 +37,43 @@ class User(Base):
         """Hash a password"""
         return pwd_context.hash(password)
 
-class Tourist(Base):
-    __tablename__ = "tourists"
+class Trip(Base):
+    __tablename__ = "trips"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    name = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     blockchain_id = Column(String, unique=True, nullable=False)
-    location_id = Column(Integer, default=1)  # ID of selected tourist place
-    last_lat = Column(Float, default=27.1751)  # Default to Taj Mahal
-    last_lon = Column(Float, default=78.0421)
+    
+    # Trip details
+    starting_location = Column(String, nullable=False)
+    tourist_destination_id = Column(Integer, nullable=False)  # ID of tourist place
+    hotels = Column(String, nullable=True)  # JSON string of hotel list
+    mode_of_travel = Column(String, nullable=False)  # car, train, bus, flight
+    
+    # Current location tracking
+    last_lat = Column(Float, nullable=True)
+    last_lon = Column(Float, nullable=True)
     status = Column(String, default="Safe")  # Safe or Critical
     
+    # Trip status
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+    
     # Relationships
-    incidents = relationship("Incident", back_populates="tourist")
-    user = relationship("User", back_populates="tourist")
+    incidents = relationship("Incident", back_populates="trip")
+    user = relationship("User", back_populates="trips")
     
     @classmethod
-    def generate_blockchain_id(cls, name: str) -> str:
+    def generate_blockchain_id(cls, user_name: str, destination: str) -> str:
         """Generate a mock blockchain ID using SHA256 hash"""
-        return hashlib.sha256(f"{name}{datetime.now()}".encode()).hexdigest()
+        return hashlib.sha256(f"{user_name}_{destination}_{datetime.now()}".encode()).hexdigest()
 
 class Incident(Base):
     __tablename__ = "incidents"
     
     id = Column(Integer, primary_key=True, index=True)
-    tourist_id = Column(Integer, ForeignKey("tourists.id"), nullable=False)
+    trip_id = Column(Integer, ForeignKey("trips.id"), nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     severity = Column(String, default="Critical")  # Low, Medium, High, Critical
     incident_type = Column(String, default="Geofence")  # Geofence, SOS, Manual
@@ -71,8 +85,8 @@ class Incident(Base):
     acknowledged_at = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, nullable=True)
     
-    # Relationship to tourist
-    tourist = relationship("Tourist", back_populates="incidents")
+    # Relationship to trip
+    trip = relationship("Trip", back_populates="incidents")
 
 # Database configuration
 import os

@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import timedelta
 
-from models import User, Tourist, get_db
-from schemas import UserCreate, Token, TouristRegistration
+from models import User, Trip, get_db
+from schemas import UserCreate, Token, UserRegistration
 from services import get_tourist_place_by_id
 from config import INDIAN_TOURIST_PLACES
 from auth import (

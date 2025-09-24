@@ -1,13 +1,21 @@
 # Pydantic models for request/response validation
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
-class TouristRegistration(BaseModel):
-    name: str
+class UserRegistration(BaseModel):
+    full_name: str
     email: str
     password: str
-    location_id: int = 1  # Default to Taj Mahal
+    contact_number: str
+    age: int
+    gender: str  # 'M' or 'F'
+
+class TripCreation(BaseModel):
+    starting_location: str
+    tourist_destination_id: int
+    hotels: Optional[str] = None  # JSON string of hotel list
+    mode_of_travel: str  # car, train, bus, flight
 
 class UserLogin(BaseModel):
     email: str
@@ -24,7 +32,7 @@ class Token(BaseModel):
     token_type: str
 
 class LocationUpdate(BaseModel):
-    tourist_id: int
+    trip_id: int
     latitude: float
     longitude: float
     
@@ -34,16 +42,24 @@ class LocationUpdate(BaseModel):
         if not (-180 <= self.longitude <= 180):
             raise ValueError("Longitude must be between -180 and 180 degrees")
 
-class TouristData(BaseModel):
+class TripData(BaseModel):
     id: int
-    name: str
+    user_name: str
     blockchain_id: str
-    last_lat: float
-    last_lon: float
+    starting_location: str
+    tourist_destination_id: int
+    tourist_destination_name: str
+    hotels: Optional[str]
+    mode_of_travel: str
+    last_lat: Optional[float]
+    last_lon: Optional[float]
     status: str
-    location_id: int
-    location_name: str
+    is_active: bool
+    created_at: str
+
+class TripClose(BaseModel):
+    trip_id: int
 
 class MapData(BaseModel):
-    tourist: dict
+    trip: dict
     geofence: dict

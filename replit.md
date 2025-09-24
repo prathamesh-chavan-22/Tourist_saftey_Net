@@ -6,7 +6,7 @@ The system uses a simple rule-based AI approach where tourists are classified as
 
 ## Recent Changes
 
-**September 23, 2025** - Major Code Modularization:
+**September 23, 2025** - Major Code Modularization & PostgreSQL Migration:
 - Refactored monolithic `app.py` (800+ lines) into modular architecture
 - Created `config.py` for centralized configuration and constants  
 - Created `schemas.py` for Pydantic request/response models
@@ -18,6 +18,9 @@ The system uses a simple rule-based AI approach where tourists are classified as
   - `routers/tourist.py` - Tourist-specific endpoints
 - Maintained all existing functionality and backwards compatibility
 - Improved code organization and maintainability without breaking changes
+- **Database Migration**: Migrated from SQLite to PostgreSQL using environment variables
+- Updated SQLAlchemy configuration to use `asyncpg` driver for async PostgreSQL connections
+- Leveraged Replit's built-in PostgreSQL database integration for secure configuration management
 
 # User Preferences
 
@@ -33,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 - SQLAlchemy ORM for database interactions with dependency injection pattern
 - Jinja2 templates for server-side rendering of HTML pages
 
-**Database Design**: SQLite with two main entities
+**Database Design**: PostgreSQL with two main entities
 - `tourists` table: stores tourist information, blockchain IDs, current location, and safety status
 - `incidents` table: logs safety incidents with foreign key relationship to tourists
 - Database session management through FastAPI dependency injection
@@ -86,8 +89,9 @@ Preferred communication style: Simple, everyday language.
 - **WebSocket API**: Native browser WebSocket support for real-time communication
 
 ## Database
-- **SQLite**: File-based database for local development and prototyping
-- Designed to be easily replaceable with PostgreSQL or other databases for production
+- **PostgreSQL**: Production-ready relational database provided by Replit's built-in database integration
+- Uses `asyncpg` driver for async database operations with SQLAlchemy
+- Environment variable configuration for secure credential management
 
 ## Development Tools
 - **Uvicorn**: ASGI server for running FastAPI applications
