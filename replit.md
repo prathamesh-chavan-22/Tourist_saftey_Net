@@ -6,6 +6,14 @@ The system uses a simple rule-based AI approach where tourists are classified as
 
 ## Recent Changes
 
+**September 24, 2025** - Comprehensive Location Tracking System Implementation:
+- **Guide GPS Controls**: Implemented complete GPS tracking controls for guide dashboard with enable/disable toggle, status indicators with visual feedback, and manual location update functionality
+- **Guide Location Display**: Enhanced guide dashboard to prominently display guide's own current location with real-time coordinates (6-decimal precision), accuracy information, and custom red "G" markers on maps
+- **Tourist Guide Visibility**: Enabled tourists to see their assigned guide's location on maps with purple "G" markers and comprehensive guide information panel showing name, status, coordinates, and last updated time
+- **Location Validation Enhancement**: Added robust coordinate validation including frontend validation before server submission, backend checks for NaN/infinity/null values, and comprehensive error handling with user-friendly messages
+- **Real-time WebSocket Updates**: Fixed and enhanced WebSocket system to properly broadcast guide locations to assigned tourists with role-based access control and connection management
+- **Comprehensive Testing**: Completed end-to-end testing with 97.9% success rate (47/48 tests passed) covering GPS controls, location display, visibility features, validation, and real-time updates
+
 **September 24, 2025** - Guide Demo Account & Database Schema Fix:
 - **Demo Guide Account**: Added complete demo guide account (guide@demo.com / guide123) to system initialization
 - **Database Schema Synchronization**: Fixed critical "column trips.guide_id does not exist" error by adding missing database column

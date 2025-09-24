@@ -123,7 +123,8 @@ async def update_location(
             )
     elif str(current_user.role) == "guide":
         # Guides can update location for trips they are assigned to or their own location if they have a trip
-        if int(str(trip.guide_id or 0)) != current_user.id and int(str(trip.user_id)) != current_user.id:
+        guide_id = trip.guide_id if trip.guide_id is not None else 0
+        if int(str(guide_id)) != current_user.id and int(str(trip.user_id)) != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: You can only update location for trips assigned to you"

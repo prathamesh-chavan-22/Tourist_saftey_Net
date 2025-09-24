@@ -38,6 +38,18 @@ class LocationUpdate(BaseModel):
     longitude: float
     
     def validate_coordinates(self):
+        # Check for NaN, infinity, or None values
+        if self.latitude is None or self.longitude is None:
+            raise ValueError("Latitude and longitude cannot be null")
+        
+        import math
+        if math.isnan(self.latitude) or math.isnan(self.longitude):
+            raise ValueError("Latitude and longitude cannot be NaN")
+        
+        if math.isinf(self.latitude) or math.isinf(self.longitude):
+            raise ValueError("Latitude and longitude cannot be infinite")
+        
+        # Check coordinate ranges
         if not (-90 <= self.latitude <= 90):
             raise ValueError("Latitude must be between -90 and 90 degrees")
         if not (-180 <= self.longitude <= 180):
@@ -48,6 +60,18 @@ class GuideLocationUpdate(BaseModel):
     longitude: float
     
     def validate_coordinates(self):
+        # Check for NaN, infinity, or None values
+        if self.latitude is None or self.longitude is None:
+            raise ValueError("Latitude and longitude cannot be null")
+        
+        import math
+        if math.isnan(self.latitude) or math.isnan(self.longitude):
+            raise ValueError("Latitude and longitude cannot be NaN")
+        
+        if math.isinf(self.latitude) or math.isinf(self.longitude):
+            raise ValueError("Latitude and longitude cannot be infinite")
+        
+        # Check coordinate ranges
         if not (-90 <= self.latitude <= 90):
             raise ValueError("Latitude must be between -90 and 90 degrees")
         if not (-180 <= self.longitude <= 180):
