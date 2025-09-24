@@ -6,6 +6,16 @@ The system uses a simple rule-based AI approach where tourists are classified as
 
 ## Recent Changes
 
+**September 24, 2025** - Comprehensive Guide Role System Implementation:
+- **Guide Role Authentication**: Implemented complete guide role system with proper access controls and authentication
+- **Guide Dashboard**: Created dedicated guide dashboard at `/guide-dashboard` with purple theme showing only assigned tourists
+- **Guide Registration**: Added guide registration system at `/guide-auth/register` similar to tourist registration with automatic login
+- **Trip-Guide Assignment**: Updated trip creation to include optional guide selection by email with backend validation
+- **Guide Location Tracking**: Enabled guides to update locations for trips they are assigned to, maintaining security
+- **Real-time WebSocket Updates**: Fixed critical WebSocket issue to properly broadcast guide locations to admin and assigned tourists
+- **Database Schema Enhancement**: Added `guide_id` field to Trip model for optional guide assignment relationships
+- **Complete System Integration**: Guides now act as "child admins" who can monitor assigned tourists with full GPS tracking capability
+
 **September 24, 2025** - Registration Flow Simplification & UX Improvements:
 - **Simplified Registration Form**: Updated registration to collect only essential user information (name, age, email, contact, password)
 - **Removed Forced Trip Selection**: Eliminated mandatory tourist destination selection during registration process
@@ -45,10 +55,16 @@ Preferred communication style: Simple, everyday language.
 - SQLAlchemy ORM for database interactions with dependency injection pattern
 - Jinja2 templates for server-side rendering of HTML pages
 
-**Database Design**: PostgreSQL with two main entities
-- `tourists` table: stores tourist information, blockchain IDs, current location, and safety status
-- `incidents` table: logs safety incidents with foreign key relationship to tourists
+**Database Design**: PostgreSQL with comprehensive user management
+- `users` table: stores user information (tourists, guides, admins) with role-based access control
+- `trips` table: manages tourist trips with optional guide assignment via `guide_id` field
+- `incidents` table: logs safety incidents with foreign key relationships
 - Database session management through FastAPI dependency injection
+
+**Role-Based Access Control**: Three-tier user system
+- **Admins**: Full system access with complete dashboard and user management
+- **Guides**: "Child admin" role with access to assigned tourists only via filtered dashboard
+- **Tourists**: Standard user role with personal trip management and location tracking
 
 **Geofencing Logic**: Rule-based safety classification system
 - Predefined circular geofences for 7 major Indian tourist destinations (Taj Mahal, Red Fort, etc.)
@@ -67,10 +83,11 @@ Preferred communication style: Simple, everyday language.
 - Geofence boundary display as circular overlays
 - Alert popups when tourists exit safe zones
 
-**Real-time Communication**: WebSocket connections for live updates
-- Bidirectional communication between clients and server
-- Automatic reconnection handling
-- Live location streaming to both tourist maps and authority dashboard
+**Real-time Communication**: Enhanced WebSocket system for live updates
+- Role-based WebSocket connections with authentication
+- Guides track assigned trip IDs for targeted location broadcasts
+- Live location streaming to tourist maps, guide dashboards, and admin dashboard
+- Automatic reconnection handling and connection management
 
 ## Data Flow Architecture
 

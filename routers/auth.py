@@ -30,12 +30,12 @@ async def register_user(user_data: UserCreate, db: AsyncSession = Depends(get_db
             detail="Email already registered"
         )
     
-    # SECURITY: Validate role against allowlist - only allow "admin" and "tourist"
-    allowed_roles = {"admin", "tourist"}
+    # SECURITY: Validate role against allowlist - only allow "admin", "tourist", and "guide"
+    allowed_roles = {"admin", "tourist", "guide"}
     if user_data.role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role. Only 'admin' and 'tourist' roles are allowed."
+            detail="Invalid role. Only 'admin', 'tourist', and 'guide' roles are allowed."
         )
     
     # Create new user
@@ -104,8 +104,10 @@ async def login_form(
     # Set cookie and redirect based on role
     if str(user.role) == "admin":
         redirect_url = "/"
+    elif str(user.role) == "guide":
+        redirect_url = "/guide-dashboard"
     else:
-        redirect_url = f"/tourist-dashboard"
+        redirect_url = "/tourist-dashboard"
     
     response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
     response.set_cookie(

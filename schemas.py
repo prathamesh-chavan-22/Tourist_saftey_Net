@@ -16,6 +16,7 @@ class TripCreation(BaseModel):
     tourist_destination_id: int
     hotels: Optional[str] = None  # JSON string of hotel list
     mode_of_travel: str  # car, train, bus, flight
+    guide_email: Optional[str] = None  # Optional guide assignment by email
 
 class UserLogin(BaseModel):
     email: str

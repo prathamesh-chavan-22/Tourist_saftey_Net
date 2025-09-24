@@ -106,20 +106,28 @@ async def update_location(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
     
-    # SECURITY: Default-deny authorization - only allow role="tourist" to update their own positions
+    # SECURITY: Default-deny authorization - only allow role="tourist" and "guide" to update positions
     # All other roles are explicitly denied
-    if str(current_user.role) != "tourist":
+    if str(current_user.role) not in ["tourist", "guide"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: Only tourists can update location positions"
+            detail="Access denied: Only tourists and guides can update location positions"
         )
     
-    # Tourist users can only update their own trip location
-    if int(str(trip.user_id)) != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: You can only update your own trip location"
-        )
+    # Authorization: tourists can update their own trip location, guides can update trips they are assigned to
+    if str(current_user.role) == "tourist":
+        if int(str(trip.user_id)) != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only update your own trip location"
+            )
+    elif str(current_user.role) == "guide":
+        # Guides can update location for trips they are assigned to or their own location if they have a trip
+        if int(str(trip.guide_id or 0)) != current_user.id and int(str(trip.user_id)) != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only update location for trips assigned to you"
+            )
     
     # Store trip data before session operations to avoid detachment issues
     trip_id = trip.id

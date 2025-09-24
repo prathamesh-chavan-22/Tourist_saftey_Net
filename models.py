@@ -26,7 +26,8 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationship to trips (one-to-many)
-    trips = relationship("Trip", back_populates="user")
+    trips = relationship("Trip", back_populates="user", foreign_keys="Trip.user_id")
+    guided_trips = relationship("Trip", foreign_keys="Trip.guide_id")
     
     def verify_password(self, password: str) -> bool:
         """Verify password against hashed password"""
@@ -42,6 +43,7 @@ class Trip(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    guide_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional guide assignment
     blockchain_id = Column(String, unique=True, nullable=False)
     
     # Trip details
@@ -62,7 +64,8 @@ class Trip(Base):
     
     # Relationships
     incidents = relationship("Incident", back_populates="trip")
-    user = relationship("User", back_populates="trips")
+    user = relationship("User", back_populates="trips", foreign_keys=[user_id])
+    guide = relationship("User", foreign_keys=[guide_id], overlaps="guided_trips")
     
     @classmethod
     def generate_blockchain_id(cls, user_name: str, destination: str) -> str:

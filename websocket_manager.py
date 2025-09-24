@@ -7,19 +7,20 @@ from models import User, Trip
 
 class AuthenticatedConnection:
     """Represents an authenticated WebSocket connection with user information"""
-    def __init__(self, websocket: WebSocket, user: User, trip: Optional[Trip] = None):
+    def __init__(self, websocket: WebSocket, user: User, trip: Optional[Trip] = None, assigned_trip_ids: Optional[List[int]] = None):
         self.websocket = websocket
         self.user = user
-        self.trip = trip
+        self.trip = trip  # For tourists, this is their active trip
+        self.assigned_trip_ids = assigned_trip_ids or []  # For guides, these are trip IDs they supervise
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[AuthenticatedConnection] = []
 
-    async def connect(self, websocket: WebSocket, user: User, trip: Optional[Trip] = None):
+    async def connect(self, websocket: WebSocket, user: User, trip: Optional[Trip] = None, assigned_trip_ids: Optional[List[int]] = None):
         """Connect an authenticated user with WebSocket"""
         await websocket.accept()
-        connection = AuthenticatedConnection(websocket, user, trip)
+        connection = AuthenticatedConnection(websocket, user, trip, assigned_trip_ids)
         self.active_connections.append(connection)
         return connection
 
@@ -56,7 +57,7 @@ class ConnectionManager:
         
         for connection in self.active_connections.copy():
             # Check if this connection belongs to the target trip
-            if (connection.trip is not None and connection.trip.id == trip_id):
+            if (connection.trip is not None and int(str(connection.trip.id)) == trip_id):
                 try:
                     await connection.websocket.send_text(message)
                 except Exception as e:
@@ -72,6 +73,7 @@ class ConnectionManager:
         Broadcast location update with role-based filtering:
         - Admin users: receive all trip location updates
         - Tourist users: only receive their own trip location updates
+        - Guide users: receive location updates for trips they are assigned to
         """
         message = json.dumps(location_data)
         
@@ -80,6 +82,27 @@ class ConnectionManager:
         
         # Send to the specific trip whose location was updated
         await self.send_to_trip(trip_id, message)
+        
+        # Send to guides assigned to this trip
+        await self.send_to_assigned_guides(trip_id, message)
+
+    async def send_to_assigned_guides(self, trip_id: int, message: str):
+        """Send message to guides assigned to a specific trip"""
+        connections_to_remove = []
+        
+        for connection in self.active_connections.copy():
+            # Check if this is a guide connection and if they are assigned to this trip
+            if (str(connection.user.role) == "guide" and 
+                trip_id in connection.assigned_trip_ids):
+                try:
+                    await connection.websocket.send_text(message)
+                except Exception as e:
+                    connections_to_remove.append(connection)
+        
+        # Remove disconnected connections
+        for connection in connections_to_remove:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
 
     async def broadcast(self, message: str):
         """Legacy broadcast method - sends to all connections (deprecated for security)"""

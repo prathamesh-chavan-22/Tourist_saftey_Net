@@ -18,6 +18,8 @@ from schemas import LocationUpdate
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router  
 from routers.tourist import router as tourist_router
+from routers.guide import router as guide_router
+from routers.guide_auth import router as guide_auth_router
 
 app = FastAPI(title="Smart Tourist Safety Monitoring System")
 
@@ -36,6 +38,8 @@ set_connection_manager(manager)
 app.include_router(auth_router)
 app.include_router(admin_router)  
 app.include_router(tourist_router)
+app.include_router(guide_router)
+app.include_router(guide_auth_router)
 
 # Legacy routes that need to be maintained for backwards compatibility
 @app.get("/dashboard")
@@ -131,12 +135,18 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
         
         # Get active trip data if user is a tourist
         trip = None
+        assigned_trip_ids = []
+        
         if str(user.role) == "tourist":
             result = await db.execute(select(Trip).filter(Trip.user_id == user.id, Trip.is_active == True))
             trip = result.scalar_one_or_none()
+        elif str(user.role) == "guide":
+            # For guides, load all trips they are assigned to
+            result = await db.execute(select(Trip.id).filter(Trip.guide_id == user.id, Trip.is_active == True))
+            assigned_trip_ids = [int(str(trip_id)) for trip_id in result.scalars().all()]
         
         # Connect with authenticated user
-        await manager.connect(websocket, user, trip)
+        await manager.connect(websocket, user, trip, assigned_trip_ids)
         
         try:
             while True:
@@ -269,6 +279,7 @@ async def create_trip_submit(
     tourist_destination_id: int = Form(...),
     mode_of_travel: str = Form(...),
     hotels: str = Form(None),
+    guide_email: str = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
     """Handle trip creation form submission"""
@@ -297,12 +308,29 @@ async def create_trip_submit(
         if active_trip:
             return RedirectResponse(url="/tourist-dashboard?error=You already have an active trip", status_code=status.HTTP_302_FOUND)
         
+        # Find guide if email is provided
+        guide_id = None
+        if guide_email and guide_email.strip():
+            guide_result = await db.execute(select(User).filter(User.email == guide_email.strip(), User.role == "guide"))
+            guide_user = guide_result.scalar_one_or_none()
+            if guide_user:
+                guide_id = guide_user.id
+            else:
+                # If guide email provided but not found, show error
+                return templates.TemplateResponse("create_trip.html", {
+                    "request": request,
+                    "user": current_user,
+                    "tourist_places": INDIAN_TOURIST_PLACES,
+                    "error": f"Guide with email '{guide_email}' not found or is not a guide role"
+                })
+        
         # Create the new trip
         tourist_place = get_tourist_place_by_id(tourist_destination_id)
         blockchain_id = Trip.generate_blockchain_id(str(user_full_name), tourist_place["name"])
         
         new_trip = Trip(
             user_id=user_id,
+            guide_id=guide_id,
             blockchain_id=blockchain_id,
             starting_location=starting_location,
             tourist_destination_id=tourist_destination_id,
@@ -439,7 +467,10 @@ async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
     
     # Check if user is admin
     if str(current_user.role) != "admin":
-        return RedirectResponse(url="/tourist-dashboard", status_code=status.HTTP_302_FOUND)
+        if str(current_user.role) == "guide":
+            return RedirectResponse(url="/guide-dashboard", status_code=status.HTTP_302_FOUND)
+        else:
+            return RedirectResponse(url="/tourist-dashboard", status_code=status.HTTP_302_FOUND)
     
     # Get all tourist users
     tourists_result = await db.execute(select(User).filter(User.role == "tourist"))
@@ -497,6 +528,66 @@ async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
         "request": request, 
         "active_tourists": active_tourists,
         "inactive_tourists": inactive_tourists,
+        "geofence": GEOFENCE_CENTER
+    })
+
+@app.get("/guide-dashboard", response_class=HTMLResponse)
+async def guide_dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
+    """Guide dashboard page - shows only tourists assigned to this guide"""
+    # Try to get current user, redirect to login if not authenticated
+    current_user = await get_user_from_cookie_token(
+        request.cookies.get("access_token"), db
+    )
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    
+    # Check if user is guide
+    if str(current_user.role) != "guide":
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    
+    # Get all active trips assigned to this guide
+    assigned_trips_result = await db.execute(
+        select(Trip).filter(Trip.guide_id == current_user.id, Trip.is_active == True)
+    )
+    assigned_trips = assigned_trips_result.scalars().all()
+    
+    # Build tourist data for assigned trips only
+    active_tourists = []
+    
+    for trip in assigned_trips:
+        # Get user data for the trip
+        user_result = await db.execute(select(User).filter(User.id == trip.user_id))
+        user = user_result.scalar_one_or_none()
+        
+        if user:
+            tourist_place = get_tourist_place_by_id(int(str(trip.tourist_destination_id)))
+            
+            tourist_data = {
+                "id": user.id,
+                "name": user.full_name,
+                "email": user.email,
+                "contact_number": user.contact_number,
+                "age": user.age,
+                "gender": user.gender,
+                "trip_id": trip.id,
+                "blockchain_id": trip.blockchain_id,
+                "starting_location": trip.starting_location,
+                "last_lat": trip.last_lat,
+                "last_lon": trip.last_lon,
+                "status": trip.status,
+                "tourist_destination_id": trip.tourist_destination_id,
+                "location_name": tourist_place["name"],
+                "hotels": trip.hotels,
+                "mode_of_travel": trip.mode_of_travel,
+                "has_active_trip": True
+            }
+            active_tourists.append(tourist_data)
+    
+    return templates.TemplateResponse("guide_dashboard.html", {
+        "request": request, 
+        "guide": current_user,
+        "active_tourists": active_tourists,
+        "total_assigned": len(active_tourists),
         "geofence": GEOFENCE_CENTER
     })
 
