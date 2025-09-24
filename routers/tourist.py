@@ -154,14 +154,15 @@ async def update_location(
     # Broadcast location update via WebSocket using stored values with role-based filtering
     update_message = {
         "type": "location_update",
-        "trip_id": trip_id,
+        "trip_id": int(str(trip_id)),
+        "tourist_id": int(str(trip.user_id)),
         "name": trip_user_name,
         "latitude": location_data.latitude,
         "longitude": location_data.longitude,
         "status": new_status,
         "inside_fence": inside_fence
     }
-    await manager.broadcast_location_update(int(trip_id), update_message)
+    await manager.broadcast_location_update(int(str(trip_id)), update_message)
     
     return {"status": new_status, "inside_fence": inside_fence}
 

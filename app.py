@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
+import json
 
 from models import Trip, User, get_db, create_tables
 from services import create_demo_users, get_tourist_place_by_id
@@ -320,6 +321,30 @@ async def create_trip_submit(
         await db.commit()
         await db.refresh(new_trip)
         
+        # Notify admin dashboard about tourist becoming active
+        tourist_place = get_tourist_place_by_id(tourist_destination_id)
+        trip_start_message = {
+            "type": "tourist_status_change",
+            "action": "trip_started",
+            "tourist_id": current_user.id,
+            "trip_id": new_trip.id,
+            "name": current_user.full_name,
+            "email": current_user.email,
+            "contact_number": current_user.contact_number,
+            "age": current_user.age,
+            "gender": current_user.gender,
+            "blockchain_id": blockchain_id,
+            "starting_location": starting_location,
+            "last_lat": tourist_place["lat"],
+            "last_lon": tourist_place["lon"],
+            "status": "Safe",
+            "tourist_destination_id": tourist_destination_id,
+            "location_name": tourist_place["name"],
+            "hotels": hotels,
+            "mode_of_travel": mode_of_travel
+        }
+        await manager.broadcast_to_admins(json.dumps(trip_start_message))
+        
         # Redirect to dashboard with success message
         return RedirectResponse(url="/tourist-dashboard?message=Trip created successfully!", status_code=status.HTTP_302_FOUND)
         
@@ -374,6 +399,20 @@ async def close_trip(
         )
         
         await db.commit()
+        
+        # Notify admin dashboard about tourist becoming inactive
+        trip_end_message = {
+            "type": "tourist_status_change",
+            "action": "trip_ended",
+            "tourist_id": current_user.id,
+            "trip_id": trip_id,
+            "name": current_user.full_name,
+            "email": current_user.email,
+            "contact_number": current_user.contact_number,
+            "age": current_user.age,
+            "gender": current_user.gender
+        }
+        await manager.broadcast_to_admins(json.dumps(trip_end_message))
         
         # Redirect to dashboard with success message
         return RedirectResponse(url="/tourist-dashboard?message=Trip closed successfully!", status_code=status.HTTP_302_FOUND)
@@ -484,9 +523,25 @@ async def trip_map_page(
     # Get the trip's destination geofence
     tourist_place = get_tourist_place_by_id(int(str(trip.tourist_destination_id)))
     
+    # Get the tourist user data for the trip
+    tourist_result = await db.execute(select(User).filter(User.id == trip.user_id))
+    tourist_user = tourist_result.scalar_one_or_none()
+    if not tourist_user:
+        raise HTTPException(status_code=404, detail="Tourist user not found")
+    
+    # Create tourist object with trip and user data combined
+    tourist = {
+        "id": trip.id,  # Use trip ID for compatibility with frontend
+        "name": tourist_user.full_name,
+        "last_lat": trip.last_lat,
+        "last_lon": trip.last_lon,
+        "status": trip.status
+    }
+    
     return templates.TemplateResponse("map.html", {
         "request": request,
         "trip": trip,
+        "tourist": tourist,  # Pass tourist data to template
         "current_user": current_user,  # Pass current user to template
         "geofence": {
             "center_lat": tourist_place["lat"],

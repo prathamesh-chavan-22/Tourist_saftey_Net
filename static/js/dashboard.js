@@ -35,7 +35,9 @@ function initializeTouristMarkers(tourists) {
         const marker = L.marker([tourist.last_lat, tourist.last_lon])
             .addTo(map)
             .bindPopup(`<b>${tourist.name}</b><br>Status: ${tourist.status}`);
+        // Use tourist.id but store it as the same key that WebSocket updates will use
         touristMarkers[tourist.id] = marker;
+        console.log(`Initialized marker for tourist ID: ${tourist.id}`);
     });
 }
 
@@ -58,6 +60,9 @@ function initializeDashboardWebSocket() {
             console.log('Updating tourist on dashboard:', data);
             updateTouristOnMap(data);
             updateTouristInTable(data);
+        } else if (data.type === 'tourist_status_change') {
+            console.log('Tourist status change:', data);
+            handleTouristStatusChange(data);
         }
     };
 
@@ -91,13 +96,136 @@ function updateTouristOnMap(data) {
 }
 
 function updateTouristInTable(data) {
-    // Update existing row or add new one
-    const table = document.getElementById('touristsTable').getElementsByTagName('tbody')[0];
-    const existingRow = document.querySelector(`tr[data-tourist-id="${data.tourist_id}"]`);
+    // Look for existing row in both active and inactive tables
+    const activeTable = document.getElementById('activeTouristsTable');
+    const inactiveTable = document.getElementById('inactiveTouristsTable');
     
-    if (existingRow) {
+    let existingRow = null;
+    let currentTable = null;
+    
+    // Check active table first
+    if (activeTable) {
+        existingRow = activeTable.querySelector(`tr[data-tourist-id="${data.tourist_id}"]`);
+        if (existingRow) {
+            currentTable = 'active';
+        }
+    }
+    
+    // If not found in active table, check inactive table
+    if (!existingRow && inactiveTable) {
+        existingRow = inactiveTable.querySelector(`tr[data-tourist-id="${data.tourist_id}"]`);
+        if (existingRow) {
+            currentTable = 'inactive';
+        }
+    }
+    
+    if (existingRow && currentTable === 'active') {
+        // Update the active tourist row (status and coordinates)
         existingRow.children[3].textContent = data.status;
         existingRow.children[3].className = `status-${data.status.toLowerCase()}`;
         existingRow.children[4].textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
     }
+    // Note: Inactive tourists don't receive location updates as they don't have active trips
+}
+
+function handleTouristStatusChange(data) {
+    if (data.action === 'trip_started') {
+        // Tourist became active - move from inactive to active table and add marker
+        moveTouristToActiveTable(data);
+        addTouristToMap(data);
+    } else if (data.action === 'trip_ended') {
+        // Tourist became inactive - move from active to inactive table and remove marker
+        moveTouristToInactiveTable(data);
+        removeTouristFromMap(data);
+    }
+}
+
+function moveTouristToActiveTable(data) {
+    const activeTable = document.getElementById('activeTouristsTable');
+    const inactiveTable = document.getElementById('inactiveTouristsTable');
+    
+    if (!activeTable || !inactiveTable) return;
+    
+    // Remove from inactive table if it exists there
+    const inactiveRow = inactiveTable.querySelector(`tr[data-tourist-id="${data.tourist_id}"]`);
+    if (inactiveRow) {
+        inactiveRow.remove();
+    }
+    
+    // Add to active table
+    const tbody = activeTable.getElementsByTagName('tbody')[0];
+    const newRow = tbody.insertRow();
+    newRow.setAttribute('data-tourist-id', data.tourist_id);
+    
+    newRow.innerHTML = `
+        <td>${data.name}</td>
+        <td>${data.trip_id}</td>
+        <td>${data.location_name}</td>
+        <td class="status-${data.status.toLowerCase()}">${data.status}</td>
+        <td>${data.last_lat.toFixed(4)}, ${data.last_lon.toFixed(4)}</td>
+        <td><a href="/trip/${data.trip_id}" class="tourist-link">View Map</a></td>
+    `;
+    
+    // Update header counts if elements exist
+    updateTableCounts();
+}
+
+function moveTouristToInactiveTable(data) {
+    const activeTable = document.getElementById('activeTouristsTable');
+    const inactiveTable = document.getElementById('inactiveTouristsTable');
+    
+    if (!activeTable || !inactiveTable) return;
+    
+    // Remove from active table
+    const activeRow = activeTable.querySelector(`tr[data-tourist-id="${data.tourist_id}"]`);
+    if (activeRow) {
+        activeRow.remove();
+    }
+    
+    // Add to inactive table
+    const tbody = inactiveTable.getElementsByTagName('tbody')[0];
+    const newRow = tbody.insertRow();
+    newRow.setAttribute('data-tourist-id', data.tourist_id);
+    
+    newRow.innerHTML = `
+        <td>${data.name}</td>
+        <td>${data.email}</td>
+        <td>${data.contact_number}</td>
+        <td>${data.age}</td>
+        <td class="status-inactive">No Active Trip</td>
+    `;
+    
+    // Update header counts if elements exist
+    updateTableCounts();
+}
+
+function addTouristToMap(data) {
+    // Add tourist marker to map
+    const marker = L.marker([data.last_lat, data.last_lon])
+        .addTo(map)
+        .bindPopup(`<b>${data.name}</b><br>Status: ${data.status}`);
+    touristMarkers[data.tourist_id] = marker;
+}
+
+function removeTouristFromMap(data) {
+    // Remove tourist marker from map
+    if (touristMarkers[data.tourist_id]) {
+        map.removeLayer(touristMarkers[data.tourist_id]);
+        delete touristMarkers[data.tourist_id];
+    }
+}
+
+function updateTableCounts() {
+    // Update the count in table headers by finding h3 elements that contain the specific text
+    const allH3s = document.querySelectorAll('h3');
+    
+    allH3s.forEach(h3 => {
+        if (h3.textContent.includes('Active Tourists')) {
+            const activeCount = document.querySelectorAll('#activeTouristsTable tbody tr').length;
+            h3.textContent = `📋 Active Tourists (${activeCount})`;
+        } else if (h3.textContent.includes('Inactive Tourists')) {
+            const inactiveCount = document.querySelectorAll('#inactiveTouristsTable tbody tr').length;
+            h3.textContent = `👥 Inactive Tourists (${inactiveCount})`;
+        }
+    });
 }
