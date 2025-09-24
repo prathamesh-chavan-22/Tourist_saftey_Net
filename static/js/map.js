@@ -7,7 +7,7 @@ let currentLat, currentLon;
 const moveStep = 0.001; // Approximately 111 meters
 
 // Map and markers
-let map, geofenceCircle, touristMarker;
+let map, geofenceCircle, touristMarker, guideMarker;
 
 // Initialize map with provided data
 function initializeMap(touristData, geofenceData, userRole) {
@@ -71,6 +71,7 @@ function initializeWebSocket() {
     ws.onmessage = function(event) {
         console.log('WebSocket message received:', event.data);
         const data = JSON.parse(event.data);
+        
         if (data.type === 'location_update' && data.tourist_id === tourist.id) {
             console.log('Updating tourist status via WebSocket:', data);
             updateStatus(data);
@@ -82,6 +83,9 @@ function initializeWebSocket() {
             map.setView([data.latitude, data.longitude]);
             document.getElementById('coordinates').textContent = 
                 `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
+        } else if (data.type === 'guide_location_update') {
+            console.log('Received guide location update:', data);
+            updateGuideLocation(data);
         }
     };
     
@@ -121,7 +125,39 @@ function moveDirection(latChange, lonChange) {
     updateLocation();
 }
 
+// Coordinate validation utility
+function validateCoordinates(lat, lon) {
+    if (lat == null || lon == null) {
+        return "Location coordinates are missing";
+    }
+    
+    if (isNaN(lat) || isNaN(lon)) {
+        return "Location coordinates are invalid";
+    }
+    
+    if (!isFinite(lat) || !isFinite(lon)) {
+        return "Location coordinates are out of range";
+    }
+    
+    if (lat < -90 || lat > 90) {
+        return "Latitude must be between -90 and 90 degrees";
+    }
+    
+    if (lon < -180 || lon > 180) {
+        return "Longitude must be between -180 and 180 degrees";
+    }
+    
+    return null; // Valid coordinates
+}
+
 async function updateLocation() {
+    // Validate coordinates before sending
+    const validationError = validateCoordinates(currentLat, currentLon);
+    if (validationError) {
+        showLocationError(validationError);
+        return;
+    }
+    
     try {
         const response = await fetch('/update_location', {
             method: 'POST',
@@ -138,14 +174,30 @@ async function updateLocation() {
         if (response.ok) {
             const result = await response.json();
             updateStatusDisplay(result.status, result.inside_fence);
+            hideLocationError(); // Hide any previous errors
         } else if (response.status === 403) {
             // Handle 403 Forbidden - Admin trying to update location
             showAdminErrorMessage();
+        } else if (response.status === 400) {
+            // Handle validation errors from server
+            const errorData = await response.json().catch(() => ({}));
+            showLocationError(errorData.detail || 'Invalid location data');
+        } else if (response.status >= 500) {
+            // Handle server errors
+            showLocationError('Server temporarily unavailable. Please try again.');
         } else {
             console.error('Failed to update location:', response.status, response.statusText);
+            showLocationError('Failed to update location. Please try again.');
         }
     } catch (error) {
         console.error('Error updating location:', error);
+        if (error.name === 'NetworkError' || error.message.includes('Failed to fetch')) {
+            showLocationError('Connection lost. Attempting to reconnect...');
+            // Attempt reconnection
+            setTimeout(() => updateLocation(), 3000);
+        } else {
+            showLocationError('Unexpected error occurred. Please refresh the page.');
+        }
     }
 }
 
@@ -165,6 +217,33 @@ function showAdminErrorMessage() {
     setTimeout(() => {
         errorDiv.style.display = 'none';
     }, 5000);
+}
+
+function showLocationError(message) {
+    // Create or show location error message
+    let errorDiv = document.getElementById('locationError');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'locationError';
+        errorDiv.className = 'alert alert-warning';
+        document.getElementById('alertContainer').appendChild(errorDiv);
+    }
+    errorDiv.innerHTML = `🚨 <strong>Location Error:</strong> ${message}`;
+    errorDiv.style.display = 'block';
+    
+    // Auto-hide informational errors after 8 seconds
+    if (!message.includes('Connection lost') && !message.includes('Server temporarily unavailable')) {
+        setTimeout(() => {
+            hideLocationError();
+        }, 8000);
+    }
+}
+
+function hideLocationError() {
+    const errorDiv = document.getElementById('locationError');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
 }
 
 function updateStatus(data) {
@@ -226,4 +305,58 @@ function initializeControls() {
             }
         });
     });
+}
+
+// Guide location update function
+function updateGuideLocation(data) {
+    if (data.latitude == null || data.longitude == null) {
+        console.warn('Invalid guide location data:', data);
+        return;
+    }
+    
+    // Update guide info panel if it exists
+    updateGuideInfoPanel(data);
+    
+    if (guideMarker) {
+        // Update existing guide marker
+        guideMarker.setLatLng([data.latitude, data.longitude]);
+        guideMarker.setPopupContent(
+            `<b>${data.guide_name}</b><br>Role: Your Guide<br>Updated: ${new Date(data.timestamp).toLocaleTimeString()}`
+        );
+    } else {
+        // Create new guide marker with special styling
+        const guideIcon = L.divIcon({
+            html: '<div style="background: #6C5CE7; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">G</div>',
+            className: 'guide-marker',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+        
+        guideMarker = L.marker([data.latitude, data.longitude], {icon: guideIcon})
+            .addTo(map)
+            .bindPopup(`<b>${data.guide_name}</b><br>Role: Your Guide<br>Updated: ${new Date(data.timestamp).toLocaleTimeString()}`);
+            
+        console.log('Created guide marker for:', data.guide_name);
+    }
+}
+
+// Update guide info panel
+function updateGuideInfoPanel(data) {
+    const guideNameElement = document.getElementById('guideName');
+    const guideStatusElement = document.getElementById('guideStatus');
+    const guideCoordinatesElement = document.getElementById('guideCoordinates');
+    const guideUpdatedElement = document.getElementById('guideUpdated');
+    const guideInfoPanel = document.getElementById('guideInfoPanel');
+    
+    if (guideNameElement) guideNameElement.textContent = data.guide_name;
+    if (guideStatusElement) guideStatusElement.textContent = 'Active';
+    if (guideCoordinatesElement) {
+        guideCoordinatesElement.textContent = `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`;
+    }
+    if (guideUpdatedElement) {
+        guideUpdatedElement.textContent = new Date(data.timestamp).toLocaleTimeString();
+    }
+    if (guideInfoPanel) {
+        guideInfoPanel.style.display = 'block';
+    }
 }

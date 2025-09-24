@@ -1,0 +1,261 @@
+/* Tourist Theme - Welcoming, Reassuring & Intuitive */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #F5F5F5; /* Light Gray background for clarity */
+    color: #333333; /* Dark Charcoal Gray text */
+}
+
+.header {
+    background-color: #007BFF; /* Deep Sky Blue - security & calmness */
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-left h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.header-left p {
+    margin: 5px 0 0 0;
+    opacity: 0.9;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info {
+    text-align: right;
+}
+
+/* Buttons with Tourist Theme Colors */
+.logout-btn {
+    background: #DC3545; /* Clear Red for danger actions */
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.logout-btn:hover {
+    background: #c82333;
+}
+
+.create-trip-btn {
+    background: #FF9500; /* Warm Orange - adventure & optimism */
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.create-trip-btn:hover {
+    background: #e68500;
+}
+
+/* Content panels */
+.content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.trip-panel, .map-panel {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1); /* Subtle blue shadow */
+    border: 1px solid #e0e0e0;
+}
+
+.single-panel {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+    border: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+}
+
+/* Status indicators with Tourist Theme colors */
+.status-safe {
+    color: #28A745; /* Bright Green - safe/all clear */
+    font-weight: bold;
+    background-color: rgba(40, 167, 69, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.status-critical {
+    color: #DC3545; /* Clear Red - danger/SOS */
+    font-weight: bold;
+    background-color: rgba(220, 53, 69, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.status-warning {
+    color: #FFC107; /* Warm Amber - warning/caution */
+    font-weight: bold;
+    background-color: rgba(255, 193, 7, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.status-inactive {
+    color: #6c757d;
+    font-weight: bold;
+}
+
+/* Tables */
+.trip-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.trip-table th, .trip-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.trip-table th {
+    background-color: #F5F5F5; /* Light gray header */
+    color: #333333;
+    font-weight: bold;
+}
+
+.trip-table tr:hover {
+    background-color: rgba(0, 123, 255, 0.05); /* Light blue hover */
+}
+
+/* Links and buttons */
+.trip-link {
+    color: #007BFF; /* Deep Sky Blue for links */
+    text-decoration: none;
+    padding: 4px 8px;
+    border: 1px solid #007BFF;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: all 0.3s ease;
+}
+
+.trip-link:hover {
+    background-color: #007BFF;
+    color: white;
+    text-decoration: none;
+}
+
+.close-trip-btn {
+    background: #DC3545; /* Red for ending actions */
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s;
+}
+
+.close-trip-btn:hover {
+    background: #c82333;
+}
+
+/* Map styling */
+#map {
+    height: 400px;
+    border-radius: 4px;
+    border: 2px solid #007BFF; /* Blue border for map */
+}
+
+/* Alert messages with tourist colors */
+.alert {
+    padding: 15px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.alert-success {
+    background-color: rgba(40, 167, 69, 0.1);
+    border: 1px solid #28A745;
+    color: #155724;
+}
+
+.alert-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    border: 1px solid #FFC107;
+    color: #856404;
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid #DC3545;
+    color: #721c24;
+}
+
+/* Form elements */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #333333;
+    font-weight: bold;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: #007BFF; /* Blue focus color */
+}
+
+.submit-btn {
+    background: #FF9500; /* Warm Orange for action buttons */
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.submit-btn:hover {
+    background: #e68500;
+}
+
+/* Navigation links */
+.nav-link {
+    color: #007BFF;
+    text-decoration: none;
+    margin: 0 10px;
+}
+
+.nav-link:hover {
+    text-decoration: underline;
+}

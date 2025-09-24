@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/static/css/map.css" />
 </head>
-<body>
-    <div class="header">
+<body class="{% if current_user.role == 'admin' %}admin-theme{% else %}tourist-theme{% endif %}">
+    <div class="header {% if current_user.role == 'admin' %}admin-theme{% else %}tourist-theme{% endif %}">
         <h1>🇮🇳 Tourist Map - {{ tourist.name }}</h1>
         <p><strong>Location:</strong> {{ geofence.name }} | <strong>Safe Zone:</strong> {{ geofence.radius }}m radius</p>
         {% if current_user.role == "admin" %}
@@ -28,12 +28,38 @@
             <div id="status" class="status-{{ tourist.status|lower }}">{{ tourist.status }}</div>
         </div>
         <div class="status-item">
-            <h3>Location</h3>
+            <h3>Your Location</h3>
             <div id="coordinates">{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</div>
         </div>
         <div class="status-item">
-            <h3>Tourist ID</h3>
+            <h3>Trip ID</h3>
             <div>{{ tourist.id }}</div>
+        </div>
+    </div>
+
+    <!-- Guide Information Panel -->
+    <div id="guideInfoPanel" class="guide-info-panel" style="display: none;">
+        <h3>🧭 Your Assigned Guide</h3>
+        <div class="guide-info-grid">
+            <div class="guide-info-item">
+                <strong>Name:</strong>
+                <span id="guideName">--</span>
+            </div>
+            <div class="guide-info-item">
+                <strong>Status:</strong>
+                <span id="guideStatus">--</span>
+            </div>
+            <div class="guide-info-item">
+                <strong>Location:</strong>
+                <span id="guideCoordinates">--</span>
+            </div>
+            <div class="guide-info-item">
+                <strong>Last Updated:</strong>
+                <span id="guideUpdated">--</span>
+            </div>
+        </div>
+        <div class="guide-note">
+            <small>🔵 Your guide's location is shown with a purple "G" marker on the map</small>
         </div>
     </div>
 

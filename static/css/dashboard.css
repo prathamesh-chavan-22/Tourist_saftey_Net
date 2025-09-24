@@ -1,22 +1,26 @@
+/* Admin Dashboard Theme - Professional & Data-Focused */
 body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 20px;
-    background-color: #f5f5f5;
+    background-color: #ECF0F1; /* Off-White/Light Gray background */
+    color: #2C3E50; /* Dark Gray text */
 }
 .header {
-    background-color: #2c3e50;
+    background-color: #003366; /* Deep Navy Blue - professionalism */
     color: white;
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
+    border: 1px solid #BDC3C7; /* Light gray border */
 }
 .controls {
     background: white;
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(44, 62, 80, 0.1); /* Subtle shadow with dark gray */
+    border: 1px solid #BDC3C7;
 }
 .dashboard {
     display: grid;
@@ -27,7 +31,8 @@ body {
     background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(44, 62, 80, 0.1);
+    border: 1px solid #BDC3C7;
 }
 .tourist-table {
     width: 100%;
@@ -36,27 +41,49 @@ body {
 .tourist-table th, .tourist-table td {
     padding: 12px;
     text-align: left;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid #BDC3C7; /* Light gray lines */
 }
 .tourist-table th {
-    background-color: #f8f9fa;
+    background-color: #2C3E50; /* Dark Gray headers */
+    color: white;
+    font-weight: bold;
 }
+.tourist-table tr:hover {
+    background-color: #ECF0F1; /* Light hover effect */
+}
+/* Admin Status Colors - Highly Visible */
 .status-safe {
-    color: #28a745;
+    color: #2ECC71; /* Emerald Green - OK/Safe */
     font-weight: bold;
 }
 .status-critical {
-    color: #dc3545;
+    color: #E74C3C; /* Crimson Red - Critical/Emergency */
+    font-weight: bold;
+}
+.status-warning {
+    color: #F1C40F; /* Goldenrod Yellow - Warning */
+    font-weight: bold;
+}
+.status-inactive {
+    color: #95A5A6; /* Light gray for inactive */
     font-weight: bold;
 }
 #map {
     height: 400px;
     border-radius: 4px;
+    border: 2px solid #BDC3C7;
 }
 .tourist-link {
-    color: #007bff;
+    color: #00A7E1; /* Electric Blue - secondary accent */
     text-decoration: none;
+    padding: 4px 8px;
+    border: 1px solid #00A7E1;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: all 0.3s ease;
 }
 .tourist-link:hover {
-    text-decoration: underline;
+    background-color: #00A7E1;
+    color: white;
+    text-decoration: none;
 }

@@ -3,220 +3,359 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tourist Safety Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Admin Dashboard - Tourist Safety</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/static/css/dashboard.css" />
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Custom Tailwind Config -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-blue': '#007BFF',
+              'brand-orange': '#FF9500',
+              'brand-green': '#28A745',
+              'brand-red': '#DC3545',
+              'brand-yellow': '#FFC107'
+            },
+            fontFamily: {
+              'sans': ['Inter', 'Arial', 'sans-serif']
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* Leaflet map responsiveness */
+        .leaflet-container {
+            @apply rounded-xl;
         }
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        
+        /* Custom animations */
+        @keyframes pulse-status {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
-        .navbar-brand {
-            font-weight: 600;
-            color: white !important;
+        
+        .pulse-status {
+            animation: pulse-status 2s ease-in-out infinite;
         }
-        .admin-badge {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .main-container {
-            padding: 2rem 0;
-        }
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            border: none;
-            margin-bottom: 2rem;
-        }
-        .card-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px 15px 0 0 !important;
-            border: none;
-            padding: 1.5rem;
-        }
-        .card-title {
-            margin: 0;
-            font-weight: 600;
-        }
-        .map-container {
-            height: 500px;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .logout-btn {
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-        .logout-btn:hover {
-            background: rgba(255,255,255,0.3);
-            color: white;
-            transform: translateY(-1px);
-        }
-        .tourist-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-        .tourist-table th,
-        .tourist-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
-        }
-        .tourist-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #495057;
-        }
-        .tourist-table tr:hover {
-            background: #f8f9fa;
-        }
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .status-safe {
-            background: #d4edda;
-            color: #155724;
-        }
-        .status-critical {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .btn-view {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-        .btn-view:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-            color: white;
+        
+        /* Responsive table scrolling */
+        @media (max-width: 768px) {
+            .table-container {
+                overflow-x: auto;
+            }
         }
     </style>
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-shield-alt me-2"></i>
-                Tourist Safety Net - Admin Dashboard
-                <span class="admin-badge ms-2">ADMIN</span>
-            </a>
-            <div class="navbar-nav ms-auto">
-                <span class="navbar-text me-3">Monitoring all tourists</span>
-                <a href="/auth/logout" class="logout-btn">Logout</a>
-            </div>
-        </div>
-    </nav>
-
-
-    <div class="container main-container">
-        <div class="row">
-            <!-- Tourists Table -->
-            <div class="col-lg-8">
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h5 class="card-title">
-                            <i class="fas fa-users me-2"></i>
-                            Tourists Status Overview
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="tourist-table" id="touristsTable">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>ID</th>
-                                    <th>Tourist Site</th>
-                                    <th>Status</th>
-                                    <th>Coordinates</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for tourist in tourists %}
-                                <tr data-tourist-id="{{ tourist.id }}">
-                                    <td>{{ tourist.name }}</td>
-                                    <td>{{ tourist.id }}</td>
-                                    <td>{{ tourist.location_name }}</td>
-                                    <td>
-                                        <span class="status-badge status-{{ tourist.status|lower }}">{{ tourist.status }}</span>
-                                    </td>
-                                    <td>{{ "%.4f"|format(tourist.last_lat) }}, {{ "%.4f"|format(tourist.last_lon) }}</td>
-                                    <td>
-                                        <a href="/tourist/{{ tourist.id }}" class="btn-view">View Map</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-brand-blue to-blue-600 shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center py-4 md:py-6 gap-4">
+                <div class="flex-1">
+                    <h1 class="text-xl md:text-2xl lg:text-3xl font-bold text-white flex items-center gap-2 mb-2">
+                        <span class="text-2xl md:text-3xl">🇮🇳</span>
+                        <span class="hidden sm:inline">Smart Tourist Safety Monitoring Dashboard</span>
+                        <span class="sm:hidden">Admin Dashboard</span>
+                    </h1>
+                    <div class="text-blue-100 text-sm md:text-base space-y-1">
+                        <p class="flex items-center gap-2">
+                            <i class="fas fa-shield-alt"></i>
+                            SIH 2025 - Real-time monitoring of tourist safety at India's heritage sites
+                        </p>
+                        <p class="hidden md:block text-xs lg:text-sm text-blue-200">
+                            <span class="font-medium text-blue-100">Current:</span> Live tracking, geofencing & alerts • 
+                            <span class="font-medium text-blue-100">Future:</span> AI prediction, IoT sensors, mobile integration
+                        </p>
                     </div>
                 </div>
-            </div>
-
-            <!-- Overview Map -->
-            <div class="col-lg-4">
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h5 class="card-title">
-                            <i class="fas fa-map me-2"></i>
-                            Overview Map
-                        </h5>
+                <div class="flex items-center gap-3 md:gap-4">
+                    <div class="hidden md:flex flex-col items-end text-right text-white">
+                        <div class="font-medium text-sm lg:text-base flex items-center gap-1">
+                            <i class="fas fa-user-shield"></i>
+                            Admin Dashboard
+                        </div>
+                        <div class="text-blue-200 text-xs lg:text-sm">Monitoring all tourists</div>
                     </div>
-                    <div class="card-body">
-                        <div id="map" class="map-container"></div>
-                    </div>
+                    <form method="post" action="/auth/logout">
+                        <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 text-sm md:text-base">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span class="hidden sm:inline">Logout</span>
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
+    </header>
 
-
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <!-- Tourists Panel -->
+            <div class="xl:col-span-2 space-y-8">
+                <!-- Active Tourists Section -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                            <i class="fas fa-map-marked-alt text-green-600"></i>
+                            Active Tourists
+                            <span class="bg-green-100 text-green-800 text-sm font-medium px-2 py-1 rounded-full">{{ active_tourists|length }}</span>
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        {% if active_tourists %}
+                        <div class="table-container overflow-x-auto">
+                            <table class="min-w-full" id="activeTouristsTable">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-user mr-1"></i>Tourist
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-hashtag mr-1"></i>Trip ID
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                                            <i class="fas fa-map-pin mr-1"></i>Destination
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-shield-alt mr-1"></i>Status
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                                            <i class="fas fa-crosshairs mr-1"></i>Location
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-eye mr-1"></i>Action
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for tourist in active_tourists %}
+                                    <tr data-tourist-id="{{ tourist.id }}" class="hover:bg-gray-50 transition-colors duration-200">
+                                        <td class="px-4 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10">
+                                                    <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center">
+                                                        <i class="fas fa-user text-white text-sm"></i>
+                                                    </div>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <div class="text-sm font-medium text-gray-900">{{ tourist.name }}</div>
+                                                    <div class="text-sm text-gray-500 md:hidden">{{ tourist.location_name }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                                            #{{ tourist.trip_id }}
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
+                                            <span class="flex items-center gap-1">
+                                                <i class="fas fa-monument text-purple-500 text-xs"></i>
+                                                {{ tourist.location_name }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                {% if tourist.status|lower == 'safe' %}bg-green-100 text-green-800{% endif %}
+                                                {% if tourist.status|lower == 'critical' %}bg-red-100 text-red-800 pulse-status{% endif %}
+                                                {% if tourist.status|lower == 'warning' %}bg-yellow-100 text-yellow-800{% endif %}">
+                                                <i class="fas fa-{% if tourist.status|lower == 'safe' %}shield-alt{% elif tourist.status|lower == 'critical' %}exclamation-triangle{% else %}exclamation-circle{% endif %} mr-1"></i>
+                                                {{ tourist.status }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-xs text-gray-500 font-mono hidden lg:table-cell">
+                                            {{ "%.4f"|format(tourist.last_lat) }},<br>{{ "%.4f"|format(tourist.last_lon) }}
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm">
+                                            <a href="/trip/{{ tourist.trip_id }}" 
+                                               class="bg-brand-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200 inline-flex items-center gap-1">
+                                                <i class="fas fa-map"></i>
+                                                <span class="hidden sm:inline">View</span>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-12">
+                            <div class="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                                <i class="fas fa-users text-2xl text-gray-400"></i>
+                            </div>
+                            <p class="text-gray-600 font-medium">No active tourists currently</p>
+                            <p class="text-gray-500 text-sm mt-1">Tourists will appear here when they start trips</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Inactive Tourists Section -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-gray-50 to-slate-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                            <i class="fas fa-users text-gray-600"></i>
+                            Inactive Tourists
+                            <span class="bg-gray-100 text-gray-800 text-sm font-medium px-2 py-1 rounded-full">{{ inactive_tourists|length }}</span>
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        {% if inactive_tourists %}
+                        <div class="table-container overflow-x-auto">
+                            <table class="min-w-full" id="inactiveTouristsTable">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-user mr-1"></i>Name
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                                            <i class="fas fa-envelope mr-1"></i>Email
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                                            <i class="fas fa-phone mr-1"></i>Contact
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                                            <i class="fas fa-birthday-cake mr-1"></i>Age
+                                        </th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-info-circle mr-1"></i>Status
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for tourist in inactive_tourists %}
+                                    <tr data-tourist-id="{{ tourist.id }}" class="hover:bg-gray-50 transition-colors duration-200">
+                                        <td class="px-4 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10">
+                                                    <div class="h-10 w-10 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 flex items-center justify-center">
+                                                        <i class="fas fa-user text-white text-sm"></i>
+                                                    </div>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <div class="text-sm font-medium text-gray-900">{{ tourist.name }}</div>
+                                                    <div class="text-sm text-gray-500 md:hidden">{{ tourist.email }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
+                                            <span class="flex items-center gap-1">
+                                                <i class="fas fa-envelope text-gray-400 text-xs"></i>
+                                                {{ tourist.email }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600 hidden lg:table-cell">
+                                            <span class="flex items-center gap-1">
+                                                <i class="fas fa-phone text-gray-400 text-xs"></i>
+                                                {{ tourist.contact_number }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell">
+                                            <span class="flex items-center gap-1">
+                                                <i class="fas fa-birthday-cake text-gray-400 text-xs"></i>
+                                                {{ tourist.age }} years
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-clock mr-1"></i>
+                                                {{ tourist.status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-12">
+                            <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                                <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                            </div>
+                            <p class="text-green-700 font-medium">All tourists have active trips!</p>
+                            <p class="text-green-600 text-sm mt-1">Everyone is currently traveling safely</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Map Panel -->
+            <div class="xl:col-span-1">
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden sticky top-24">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                            <i class="fas fa-globe-americas text-blue-600"></i>
+                            Live Location Map
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                            <i class="fas fa-satellite-dish text-blue-500"></i>
+                            Real-time tourist tracking
+                        </p>
+                    </div>
+                    <div class="p-6">
+                        <div id="map" class="h-64 sm:h-80 lg:h-96 rounded-xl border-2 border-gray-200"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- Close main container -->
+    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://kit.fontawesome.com/a076d05399.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script>
-        // Initialize tourist markers with template data
-        const tourists = [
-            {% for tourist in tourists %}
-            {
-                id: {{ tourist.id }},
-                name: "{{ tourist.name }}",
-                last_lat: {{ tourist.last_lat }},
-                last_lon: {{ tourist.last_lon }},
-                status: "{{ tourist.status }}"
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ];
+        // Initialize tourist and guide markers with template data
+        const activeTourists = {{ active_tourists|tojson }};
+        const activeGuides = {{ active_guides|tojson }};
         
         // Initialize tourist markers from template data
-        initializeTouristMarkers(tourists);
+        initializeTouristMarkers(activeTourists);
+        
+        // Initialize guide markers from template data  
+        initializeGuideMarkers(activeGuides);
+        
+        // Add mobile-friendly enhancements
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add click handlers for mobile table rows
+            const mobileRows = document.querySelectorAll('tr[data-tourist-id]');
+            mobileRows.forEach(row => {
+                if (window.innerWidth < 768) {
+                    row.style.cursor = 'pointer';
+                    row.addEventListener('click', function() {
+                        const viewButton = this.querySelector('a[href*="/trip/"]');
+                        if (viewButton) {
+                            window.location.href = viewButton.href;
+                        }
+                    });
+                }
+            });
+            
+            // Responsive table headers
+            function updateTableResponsiveness() {
+                const screenWidth = window.innerWidth;
+                const tables = document.querySelectorAll('table');
+                
+                tables.forEach(table => {
+                    if (screenWidth < 640) {
+                        table.classList.add('text-xs');
+                    } else {
+                        table.classList.remove('text-xs');
+                    }
+                });
+            }
+            
+            updateTableResponsiveness();
+            window.addEventListener('resize', updateTableResponsiveness);
+        });
     </script>
 </body>
 </html>

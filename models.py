@@ -18,14 +18,16 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
-    role = Column(String, nullable=False, default="tourist")  # admin, tourist, or tourist_guide
+    contact_number = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    gender = Column(String, nullable=False)  # 'M' or 'F'
+    role = Column(String, nullable=False, default="tourist")  # admin or tourist
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Relationship to tourist (one-to-one)
-    tourist = relationship("Tourist", back_populates="user", uselist=False)
-    # Relationship to tourist guide (one-to-one)
-    tourist_guide = relationship("TouristGuide", back_populates="user", uselist=False)
+    # Relationship to trips (one-to-many)
+    trips = relationship("Trip", back_populates="user", foreign_keys="Trip.user_id")
+    guided_trips = relationship("Trip", foreign_keys="Trip.guide_id")
     
     def verify_password(self, password: str) -> bool:
         """Verify password against hashed password"""
@@ -36,52 +38,45 @@ class User(Base):
         """Hash a password"""
         return pwd_context.hash(password)
 
-class Tourist(Base):
-    __tablename__ = "tourists"
+class Trip(Base):
+    __tablename__ = "trips"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    name = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    guide_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional guide assignment
     blockchain_id = Column(String, unique=True, nullable=False)
-    location_id = Column(Integer, default=1)  # ID of selected tourist place
-    last_lat = Column(Float, default=27.1751)  # Default to Taj Mahal
-    last_lon = Column(Float, default=78.0421)
+    
+    # Trip details
+    starting_location = Column(String, nullable=False)
+    tourist_destination_id = Column(Integer, nullable=False)  # ID of tourist place
+    hotels = Column(String, nullable=True)  # JSON string of hotel list
+    mode_of_travel = Column(String, nullable=False)  # car, train, bus, flight
+    
+    # Current location tracking
+    last_lat = Column(Float, nullable=True)
+    last_lon = Column(Float, nullable=True)
     status = Column(String, default="Safe")  # Safe or Critical
     
+    # Trip status
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+    
     # Relationships
-    incidents = relationship("Incident", back_populates="tourist")
-    user = relationship("User", back_populates="tourist")
+    incidents = relationship("Incident", back_populates="trip")
+    user = relationship("User", back_populates="trips", foreign_keys=[user_id])
+    guide = relationship("User", foreign_keys=[guide_id], overlaps="guided_trips")
     
     @classmethod
-    def generate_blockchain_id(cls, name: str) -> str:
+    def generate_blockchain_id(cls, user_name: str, destination: str) -> str:
         """Generate a mock blockchain ID using SHA256 hash"""
-        return hashlib.sha256(f"{name}{datetime.now()}".encode()).hexdigest()
-
-class TouristGuide(Base):
-    __tablename__ = "tourist_guides"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    name = Column(String, nullable=False)
-    guide_id = Column(String, unique=True, nullable=False)
-    current_lat = Column(Float, default=27.1751)  # Default to Taj Mahal
-    current_lon = Column(Float, default=78.0421)
-    is_available = Column(Boolean, default=True)  # Available for guiding
-    specializations = Column(String, nullable=True)  # e.g., "Historical Sites, Museums"
-    
-    # Relationships
-    user = relationship("User", back_populates="tourist_guide")
-    
-    @classmethod
-    def generate_guide_id(cls, name: str) -> str:
-        """Generate a unique guide ID using SHA256 hash"""
-        return hashlib.sha256(f"guide_{name}{datetime.now()}".encode()).hexdigest()[:16]
+        return hashlib.sha256(f"{user_name}_{destination}_{datetime.now()}".encode()).hexdigest()
 
 class Incident(Base):
     __tablename__ = "incidents"
     
     id = Column(Integer, primary_key=True, index=True)
-    tourist_id = Column(Integer, ForeignKey("tourists.id"), nullable=False)
+    trip_id = Column(Integer, ForeignKey("trips.id"), nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     severity = Column(String, default="Critical")  # Low, Medium, High, Critical
     incident_type = Column(String, default="Geofence")  # Geofence, SOS, Manual
@@ -93,12 +88,40 @@ class Incident(Base):
     acknowledged_at = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, nullable=True)
     
-    # Relationship to tourist
-    tourist = relationship("Tourist", back_populates="incidents")
+    # Relationship to trip
+    trip = relationship("Trip", back_populates="incidents")
+
+class GuideLocation(Base):
+    __tablename__ = "guide_locations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    guide_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship to guide user
+    guide = relationship("User", foreign_keys=[guide_id])
+    
+    def __repr__(self):
+        return f"<GuideLocation(guide_id={self.guide_id}, lat={self.latitude}, lon={self.longitude}, updated_at={self.updated_at})>"
 
 # Database configuration
-DATABASE_URL = "sqlite+aiosqlite:///./tourist_safety.db"
-engine = create_async_engine(DATABASE_URL, echo=True)
+import os
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required")
+
+# Convert postgresql:// or postgres:// to postgresql+asyncpg:// for async driver
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
+# Use echo=False in production to avoid logging sensitive data
+engine = create_async_engine(DATABASE_URL, echo=os.environ.get("DEBUG", "False").lower() == "true")
 AsyncSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
 
 async def get_db():

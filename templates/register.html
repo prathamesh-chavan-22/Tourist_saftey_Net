@@ -9,7 +9,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #007BFF 0%, #FF9500 100%); /* Tourist theme gradient */
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -28,7 +28,7 @@
             margin-bottom: 30px;
         }
         .header h1 {
-            color: #2c3e50;
+            color: #007BFF; /* Tourist theme: Deep Sky Blue */
             margin-bottom: 5px;
             font-size: 24px;
         }
@@ -56,12 +56,12 @@
         }
         .form-group input:focus, .form-group select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #007BFF; /* Tourist theme: Deep Sky Blue */
         }
         .register-btn {
             width: 100%;
             padding: 12px;
-            background: #28a745;
+            background: #FF9500; /* Tourist theme: Warm Orange */
             color: white;
             border: none;
             border-radius: 5px;
@@ -70,7 +70,7 @@
             transition: background-color 0.3s;
         }
         .register-btn:hover {
-            background: #218838;
+            background: #e68500;
         }
         .alert {
             padding: 10px;
@@ -113,7 +113,7 @@
 
         <div class="info-box">
             <h4>🛡️ Your Safety, Our Priority</h4>
-            <p>Register to get real-time safety monitoring while exploring India's heritage sites. Your location will be tracked to ensure you stay within safe zones.</p>
+            <p>Create your account to start using the Smart Tourist Safety Monitoring System. You can create trips and get real-time safety monitoring while exploring India's heritage sites.</p>
         </div>
 
         {% if error %}
@@ -122,10 +122,20 @@
         </div>
         {% endif %}
 
-        <form method="post" action="/register" id="registerForm">
+        <form method="post" action="/tourist/register" id="registerForm">
             <div class="form-group">
                 <label for="name">Full Name</label>
                 <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" id="age" name="age" required min="16" max="100">
+            </div>
+
+            <div class="form-group">
+                <label for="contact_number">Contact Number</label>
+                <input type="tel" id="contact_number" name="contact_number" required placeholder="+91XXXXXXXXXX">
             </div>
 
             <div class="form-group">
@@ -136,15 +146,6 @@
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required minlength="6">
-            </div>
-
-            <div class="form-group">
-                <label for="location_id">Select Tourist Destination</label>
-                <select id="location_id" name="location_id" required>
-                    {% for place in tourist_places %}
-                    <option value="{{ place.id }}">{{ place.name }}</option>
-                    {% endfor %}
-                </select>
             </div>
 
             <button type="submit" class="register-btn">Create Account</button>

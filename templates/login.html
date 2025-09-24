@@ -9,7 +9,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #007BFF 0%, #FF9500 100%); /* Tourist theme gradient: Deep Sky Blue to Warm Orange */
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -56,12 +56,12 @@
         }
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #007BFF; /* Tourist theme: Deep Sky Blue for focus */
         }
         .login-btn {
             width: 100%;
             padding: 12px;
-            background: #667eea;
+            background: #FF9500; /* Tourist theme: Warm Orange for action buttons */
             color: white;
             border: none;
             border-radius: 5px;
@@ -70,7 +70,7 @@
             transition: background-color 0.3s;
         }
         .login-btn:hover {
-            background: #5a67d8;
+            background: #e68500;
         }
         .alert {
             padding: 10px;
@@ -93,31 +93,12 @@
             margin-top: 20px;
         }
         .links a {
-            color: #667eea;
+            color: #007BFF; /* Tourist theme: Deep Sky Blue for links */
             text-decoration: none;
             margin: 0 10px;
         }
         .links a:hover {
             text-decoration: underline;
-        }
-        .user-type {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .user-type button {
-            flex: 1;
-            padding: 8px;
-            border: 2px solid #ddd;
-            background: white;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: all 0.3s;
-        }
-        .user-type button.active {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
         }
         .demo-section {
             background: #f8f9fa;
@@ -249,12 +230,6 @@
         {% endif %}
 
         <form method="post" action="/auth/login-form" id="loginForm">
-            <div class="user-type">
-                <button type="button" id="touristBtn" class="active">Tourist Login</button>
-                <button type="button" id="adminBtn">Admin Login</button>
-                <button type="button" id="guideBtn">Guide Login</button>
-            </div>
-
             <div class="form-group">
                 <label for="email">Email Address</label>
                 <input type="email" id="email" name="email" required>
@@ -270,7 +245,7 @@
 
         <div class="links">
             <a href="/register-form">Create Tourist Account</a>
-            <a href="/register-guide-form">Register as Guide</a>
+            <a href="/guide-auth/register">Create Guide Account</a>
         </div>
 
         <div class="demo-section">
@@ -348,48 +323,6 @@
     </div>
 
     <script>
-        const touristBtn = document.getElementById('touristBtn');
-        const adminBtn = document.getElementById('adminBtn');
-        const guideBtn = document.getElementById('guideBtn');
-        const emailInput = document.getElementById('email');
-
-        touristBtn.addEventListener('click', function() {
-            touristBtn.classList.add('active');
-            adminBtn.classList.remove('active');
-            guideBtn.classList.remove('active');
-            emailInput.placeholder = 'tourist@example.com';
-        });
-
-        adminBtn.addEventListener('click', function() {
-            adminBtn.classList.add('active');
-            touristBtn.classList.remove('active');
-            guideBtn.classList.remove('active');
-            emailInput.placeholder = 'admin@example.com';
-        });
-
-        guideBtn.addEventListener('click', function() {
-            guideBtn.classList.add('active');
-            touristBtn.classList.remove('active');
-            adminBtn.classList.remove('active');
-            emailInput.placeholder = 'guide@example.com';
-        });
-
-        // Auto-fill demo credentials
-        touristBtn.addEventListener('dblclick', function() {
-            document.getElementById('email').value = 'tourist@demo.com';
-            document.getElementById('password').value = 'tourist123';
-        });
-
-        adminBtn.addEventListener('dblclick', function() {
-            document.getElementById('email').value = 'admin@demo.com';
-            document.getElementById('password').value = 'admin123';
-        });
-
-        guideBtn.addEventListener('dblclick', function() {
-            document.getElementById('email').value = 'guide@demo.com';
-            document.getElementById('password').value = 'guide123';
-        });
-
         // Modal functions
         function showModal(modalId) {
             document.getElementById(modalId).style.display = 'block';

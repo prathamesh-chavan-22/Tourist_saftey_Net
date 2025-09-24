@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Trip</title>
+    <link rel="stylesheet" href="/static/css/tourist.css" />
+    <style>
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+            border: 1px solid #e0e0e0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007BFF; /* Tourist theme: Deep Sky Blue */
+            margin-bottom: 10px;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .submit-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        .submit-btn:hover {
+            background: #0056b3;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/tourist-dashboard" class="back-link">← Back to Dashboard</a>
+        
+        <div class="header">
+            <h1>🎯 Create New Trip</h1>
+            <p>Plan your safety-tracked journey</p>
+        </div>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/create-trip">
+            <div class="form-group">
+                <label for="starting_location">Starting Location:</label>
+                <input type="text" id="starting_location" name="starting_location" 
+                       placeholder="Enter your starting point" required>
+            </div>
+
+            <div class="form-group">
+                <label for="tourist_destination_id">Destination:</label>
+                <select id="tourist_destination_id" name="tourist_destination_id" required>
+                    <option value="">Select a destination</option>
+                    {% for place in tourist_places %}
+                    <option value="{{ place.id }}">{{ place.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="mode_of_travel">Mode of Travel:</label>
+                <select id="mode_of_travel" name="mode_of_travel" required>
+                    <option value="">Select transportation</option>
+                    <option value="car">Car</option>
+                    <option value="train">Train</option>
+                    <option value="bus">Bus</option>
+                    <option value="flight">Flight</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="hotels">Hotels/Accommodation (optional):</label>
+                <textarea id="hotels" name="hotels" 
+                         placeholder="List any hotels or accommodation details"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="guide_email">Guide (optional):</label>
+                <input type="email" id="guide_email" name="guide_email" 
+                       placeholder="Enter guide's email address (optional)">
+                <small style="color: #666; font-size: 12px;">Leave empty if no guide is needed for this trip</small>
+            </div>
+
+            <button type="submit" class="submit-btn">Create Trip</button>
+        </form>
+    </div>
+</body>
+</html>

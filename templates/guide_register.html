@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guide Registration - Tourist Safety</title>
+    <link rel="stylesheet" href="/static/css/tourist.css" />
+    <style>
+        body {
+            background: linear-gradient(135deg, #6c5ce7 0%, #74b9ff 100%);
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(108, 92, 231, 0.2);
+            border: 1px solid #e0e0e0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #6C5CE7;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #6C5CE7;
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
+        }
+        .submit-btn {
+            background: linear-gradient(135deg, #6c5ce7, #74b9ff);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: transform 0.2s ease;
+        }
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(108, 92, 231, 0.3);
+        }
+        .login-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #6C5CE7;
+            text-decoration: none;
+        }
+        .login-link:hover {
+            text-decoration: underline;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .feature-list {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #6C5CE7;
+        }
+        .feature-list h3 {
+            color: #6C5CE7;
+            margin-bottom: 10px;
+        }
+        .feature-list ul {
+            color: #666;
+            padding-left: 20px;
+        }
+        .feature-list li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧭 Guide Registration</h1>
+            <p>Join as a tourist guide and help ensure safe travels</p>
+        </div>
+
+        <div class="feature-list">
+            <h3>As a Guide, you will:</h3>
+            <ul>
+                <li>Monitor and guide assigned tourists during their trips</li>
+                <li>Access a dedicated dashboard showing your assigned tourists</li>
+                <li>Share your live location with admin and tourists</li>
+                <li>Help ensure tourist safety at heritage sites</li>
+                <li>Respond to critical situations and provide assistance</li>
+            </ul>
+        </div>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/guide-auth/register">
+            <div class="form-group">
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" name="name" 
+                       placeholder="Enter your full name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address:</label>
+                <input type="email" id="email" name="email" 
+                       placeholder="Enter your email address" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" 
+                       placeholder="Create a secure password" required>
+            </div>
+
+            <div class="form-group">
+                <label for="contact_number">Contact Number:</label>
+                <input type="tel" id="contact_number" name="contact_number" 
+                       placeholder="Enter your phone number" required>
+            </div>
+
+            <div class="form-group">
+                <label for="age">Age:</label>
+                <input type="number" id="age" name="age" min="18" max="100"
+                       placeholder="Enter your age" required>
+            </div>
+
+            <div class="form-group">
+                <label for="gender">Gender:</label>
+                <select id="gender" name="gender" required>
+                    <option value="">Select gender</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                </select>
+            </div>
+
+            <button type="submit" class="submit-btn">Register as Guide</button>
+        </form>
+
+        <a href="/login" class="login-link">Already have an account? Login here</a>
+    </div>
+</body>
+</html>
