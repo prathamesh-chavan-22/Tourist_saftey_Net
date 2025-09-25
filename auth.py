@@ -198,6 +198,15 @@ async def get_current_active_user_flexible(current_user: User = Depends(get_curr
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+async def require_guide_flexible(current_user: User = Depends(get_current_active_user_flexible)):
+    """Require guide role with flexible authentication (Bearer token or cookie)"""
+    if str(current_user.role) != "guide":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Guide access required"
+        )
+    return current_user
+
 async def authenticate_user(email: str, password: str, db: AsyncSession) -> Optional[User]:
     """Authenticate user with email and password"""
     result = await db.execute(select(User).filter(User.email == email))

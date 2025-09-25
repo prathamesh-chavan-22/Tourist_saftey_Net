@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models import User, Trip, GuideLocation, get_db
-from auth import require_guide
+from auth import require_guide, require_guide_flexible
 from services import get_tourist_place_by_id
 from schemas import GuideLocationUpdate
 from datetime import datetime
@@ -70,7 +70,7 @@ async def get_guide_dashboard_data(
 @router.post("/update_location")
 async def update_guide_location(
     location_data: GuideLocationUpdate,
-    current_user: User = Depends(require_guide),
+    current_user: User = Depends(require_guide_flexible),
     db: AsyncSession = Depends(get_db)
 ):
     """Update guide location and broadcast to appropriate users"""
@@ -80,9 +80,13 @@ async def update_guide_location(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+    # Store user data before any database operations that might detach the object
+    user_id = current_user.id
+    user_name = current_user.full_name
+    
     # Check if guide already has a location record
     result = await db.execute(
-        select(GuideLocation).filter(GuideLocation.guide_id == current_user.id)
+        select(GuideLocation).filter(GuideLocation.guide_id == user_id)
     )
     guide_location = result.scalar_one_or_none()
     
@@ -94,7 +98,7 @@ async def update_guide_location(
     else:
         # Create new location record
         guide_location = GuideLocation(
-            guide_id=current_user.id,
+            guide_id=user_id,
             latitude=location_data.latitude,
             longitude=location_data.longitude
         )
@@ -106,8 +110,8 @@ async def update_guide_location(
     # Prepare broadcast message
     message_data = {
         "type": "guide_location_update",
-        "guide_id": current_user.id,
-        "guide_name": current_user.full_name,
+        "guide_id": user_id,
+        "guide_name": user_name,
         "latitude": location_data.latitude,
         "longitude": location_data.longitude,
         "timestamp": datetime.utcnow().isoformat()
@@ -115,7 +119,7 @@ async def update_guide_location(
     
     # Broadcast to appropriate users (admin + assigned tourists)
     if manager:
-        await manager.broadcast_guide_location_update(current_user.id, message_data)
+        await manager.broadcast_guide_location_update(user_id, message_data)
     
     return {
         "status": "success",

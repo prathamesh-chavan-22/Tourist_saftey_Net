@@ -2,12 +2,18 @@
 class GuideGPSTracker {
     constructor() {
         this.gpsEnabled = false;
+        this.developerMode = false;
         this.watchId = null;
         this.guideMarker = null;
         this.lastUpdate = 0;
         this.updateThreshold = 10000; // 10 seconds minimum between updates
         this.accuracyThreshold = 100; // Only use positions with < 100m accuracy
         this.isUpdating = false;
+        
+        // Manual movement properties
+        this.currentLat = null;
+        this.currentLon = null;
+        this.moveStep = 0.001; // Approximately 111 meters
         
         this.initializeControls();
     }
@@ -17,6 +23,10 @@ class GuideGPSTracker {
         const toggleBackground = document.getElementById('toggleBackground');
         const gpsToggle = document.getElementById('gpsToggle');
         const updateLocationBtn = document.getElementById('updateLocationBtn');
+        
+        // Initialize developer mode controls
+        const devModeBackground = document.getElementById('devModeBackground');
+        const devModeToggle = document.getElementById('devModeToggle');
         
         if (toggleBackground) {
             toggleBackground.addEventListener('click', () => this.toggleGPS());
@@ -30,6 +40,17 @@ class GuideGPSTracker {
             updateLocationBtn.addEventListener('click', () => this.manualLocationUpdate());
         }
         
+        if (devModeBackground) {
+            devModeBackground.addEventListener('click', () => this.toggleDeveloperMode());
+        }
+        
+        if (devModeToggle) {
+            devModeToggle.addEventListener('change', () => this.toggleDeveloperMode());
+        }
+        
+        // Initialize arrow controls
+        this.initializeArrowControls();
+        
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => this.stopGPSTracking());
         
@@ -37,8 +58,145 @@ class GuideGPSTracker {
         console.log('Guide GPS controls initialized:', {
             toggleBackground: !!toggleBackground,
             gpsToggle: !!gpsToggle,
-            updateLocationBtn: !!updateLocationBtn
+            updateLocationBtn: !!updateLocationBtn,
+            devModeBackground: !!devModeBackground,
+            devModeToggle: !!devModeToggle
         });
+        
+        // Debug logging for developer mode elements
+        console.log('Developer mode elements check:', {
+            devModeBackground: !!devModeBackground,
+            devModeToggle: !!devModeToggle,
+            devModeButton: !!document.getElementById('devModeButton'),
+            gpsControls: !!document.getElementById('gpsControls'),
+            manualControls: !!document.getElementById('manualControls'),
+            modeIndicator: !!document.getElementById('modeIndicator'),
+            modeText: !!document.getElementById('modeText')
+        });
+    }
+    
+    initializeArrowControls() {
+        // Keyboard controls for manual movement
+        document.addEventListener('keydown', (event) => {
+            if (!this.developerMode) return;
+            
+            switch(event.key) {
+                case 'ArrowUp':
+                    event.preventDefault();
+                    this.moveUp();
+                    break;
+                case 'ArrowDown':
+                    event.preventDefault();
+                    this.moveDown();
+                    break;
+                case 'ArrowLeft':
+                    event.preventDefault();
+                    this.moveLeft();
+                    break;
+                case 'ArrowRight':
+                    event.preventDefault();
+                    this.moveRight();
+                    break;
+            }
+        });
+
+        // Button controls for manual movement
+        document.querySelectorAll('.arrow-key').forEach(button => {
+            button.addEventListener('click', () => {
+                if (!this.developerMode) return;
+                
+                const direction = button.getAttribute('data-direction');
+                switch(direction) {
+                    case 'up': this.moveUp(); break;
+                    case 'down': this.moveDown(); break;
+                    case 'left': this.moveLeft(); break;
+                    case 'right': this.moveRight(); break;
+                }
+            });
+        });
+    }
+    
+    toggleDeveloperMode() {
+        this.developerMode = !this.developerMode;
+        
+        const devModeToggle = document.getElementById('devModeToggle');
+        const devModeBackground = document.getElementById('devModeBackground');
+        const devModeButton = document.getElementById('devModeButton');
+        const gpsControls = document.getElementById('gpsControls');
+        const manualControls = document.getElementById('manualControls');
+        const modeIndicator = document.getElementById('modeIndicator');
+        const modeText = document.getElementById('modeText');
+        
+        if (devModeToggle) {
+            devModeToggle.checked = this.developerMode;
+        }
+        
+        if (devModeBackground && devModeButton) {
+            if (this.developerMode) {
+                devModeBackground.classList.remove('bg-gray-200');
+                devModeBackground.classList.add('bg-guide-purple');
+                devModeButton.style.transform = 'translateX(20px) translateY(2px)';
+            } else {
+                devModeBackground.classList.remove('bg-guide-purple');
+                devModeBackground.classList.add('bg-gray-200');
+                devModeButton.style.transform = 'translateX(2px) translateY(2px)';
+            }
+        }
+        
+        // Toggle control visibility
+        if (gpsControls && manualControls) {
+            if (this.developerMode) {
+                gpsControls.classList.add('hidden');
+                manualControls.classList.remove('hidden');
+                // Stop GPS when entering developer mode
+                if (this.gpsEnabled) {
+                    this.toggleGPS();
+                }
+            } else {
+                gpsControls.classList.remove('hidden');
+                manualControls.classList.add('hidden');
+            }
+        }
+        
+        // Update mode indicator
+        if (modeIndicator && modeText) {
+            if (this.developerMode) {
+                modeIndicator.classList.remove('bg-gray-400', 'bg-green-500');
+                modeIndicator.classList.add('bg-guide-purple');
+                modeText.textContent = 'Manual Mode';
+            } else {
+                modeIndicator.classList.remove('bg-guide-purple', 'bg-green-500');
+                modeIndicator.classList.add('bg-gray-400');
+                modeText.textContent = 'GPS Mode';
+            }
+        }
+        
+        console.log('Developer mode:', this.developerMode ? 'enabled' : 'disabled');
+    }
+    
+    // Manual movement functions
+    moveUp() { this.moveDirection(this.moveStep, 0); }
+    moveDown() { this.moveDirection(-this.moveStep, 0); }
+    moveLeft() { this.moveDirection(0, -this.moveStep); }
+    moveRight() { this.moveDirection(0, this.moveStep); }
+    
+    moveDirection(latChange, lonChange) {
+        // Initialize current position if not set
+        if (this.currentLat === null || this.currentLon === null) {
+            // Set default position (center of India)
+            this.currentLat = 20.5937;
+            this.currentLon = 78.9629;
+        }
+        
+        this.currentLat += latChange;
+        this.currentLon += lonChange;
+        
+        // Update location display and marker
+        this.updateLocationDisplay(this.currentLat, this.currentLon);
+        this.updateGuideMarkerOnMap(this.currentLat, this.currentLon);
+        
+        // Send location update to server
+        this.updateGuideLocation(this.currentLat, this.currentLon);
     }
     
     // Coordinate validation utility for guides
