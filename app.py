@@ -203,6 +203,7 @@ async def tourist_dashboard_page(request: Request, message: Optional[str] = None
     # Get active trip data for this user
     active_trip = None
     past_trips = []
+    assigned_guide = None
     
     for trip in all_trips:
         tourist_place = get_tourist_place_by_id(int(str(trip.tourist_destination_id)))
@@ -219,11 +220,52 @@ async def tourist_dashboard_page(request: Request, message: Optional[str] = None
             "mode_of_travel": trip.mode_of_travel,
             "is_active": trip.is_active,
             "created_at": trip.created_at,
-            "closed_at": trip.closed_at
+            "closed_at": trip.closed_at,
+            "guide_id": trip.guide_id
         }
         
-        if bool(trip.is_active):
+        if trip.is_active:
             active_trip = trip_data
+            
+            # Get guide information for active trip
+            if trip.guide_id:
+                # Fetch guide user info
+                guide_result = await db.execute(select(User).filter(User.id == trip.guide_id))
+                guide_user = guide_result.scalar_one_or_none()
+                
+                if guide_user:
+                    # Get guide's latest location
+                    from models import GuideLocation
+                    from sqlalchemy import desc
+                    guide_location_result = await db.execute(
+                        select(GuideLocation)
+                        .filter(GuideLocation.guide_id == guide_user.id)
+                        .order_by(desc(GuideLocation.updated_at))
+                        .limit(1)
+                    )
+                    guide_location = guide_location_result.scalar_one_or_none()
+                    
+                    # Determine guide GPS status
+                    from datetime import datetime, timedelta
+                    guide_gps_working = False
+                    guide_status = "no_location"
+                    
+                    if guide_location:
+                        time_diff = datetime.utcnow() - guide_location.updated_at
+                        guide_gps_working = time_diff.total_seconds() < 600  # 10 minutes
+                        guide_status = "gps_active" if guide_gps_working else "last_known"
+                    
+                    assigned_guide = {
+                        "id": guide_user.id,
+                        "name": guide_user.full_name,
+                        "email": guide_user.email,
+                        "contact_number": guide_user.contact_number,
+                        "last_lat": guide_location.latitude if guide_location else None,
+                        "last_lon": guide_location.longitude if guide_location else None,
+                        "updated_at": guide_location.updated_at.isoformat() if guide_location else None,
+                        "gps_working": guide_gps_working,
+                        "status": guide_status
+                    }
         else:
             past_trips.append(trip_data)
     
@@ -243,6 +285,7 @@ async def tourist_dashboard_page(request: Request, message: Optional[str] = None
         "user": current_user,
         "active_trip": active_trip,
         "past_trips": past_trips,
+        "assigned_guide": assigned_guide,
         "tourist_places": INDIAN_TOURIST_PLACES,
         "geofence": geofence_data,
         "message": message,
@@ -526,35 +569,72 @@ async def dashboard_page(request: Request, db: AsyncSession = Depends(get_db)):
             })
             inactive_tourists.append(tourist_data)
     
-    # Get active guide locations (updated within last 10 minutes)
+    # Get all guides and their last known locations
     from datetime import datetime, timedelta
     from models import GuideLocation
-    ten_minutes_ago = datetime.utcnow() - timedelta(minutes=10)
-    guide_result = await db.execute(
-        select(GuideLocation, User)
-        .join(User, GuideLocation.guide_id == User.id)
-        .filter(GuideLocation.updated_at > ten_minutes_ago)
-    )
-    guide_locations = guide_result.all()
+    from sqlalchemy import desc
+    
+    # Get all guide users
+    all_guides_result = await db.execute(select(User).filter(User.role == "guide"))
+    all_guides = all_guides_result.scalars().all()
     
     active_guides = []
-    for guide_location, guide_user in guide_locations:
+    ten_minutes_ago = datetime.utcnow() - timedelta(minutes=10)
+    
+    for guide_user in all_guides:
+        # Get the latest location for this guide
+        latest_location_result = await db.execute(
+            select(GuideLocation)
+            .filter(GuideLocation.guide_id == guide_user.id)
+            .order_by(desc(GuideLocation.updated_at))
+            .limit(1)
+        )
+        latest_location = latest_location_result.scalar_one_or_none()
+        
         # Count assigned tourists for this guide
         assigned_trips_result = await db.execute(
             select(Trip).filter(Trip.guide_id == guide_user.id, Trip.is_active == True)
         )
         assigned_count = len(assigned_trips_result.scalars().all())
         
-        active_guides.append({
-            "id": guide_user.id,
-            "name": guide_user.full_name,
-            "email": guide_user.email,
-            "last_lat": guide_location.latitude,
-            "last_lon": guide_location.longitude,
-            "updated_at": guide_location.updated_at.isoformat(),
-            "assigned_tourist_count": assigned_count,
-            "status": "active"
-        })
+        # Determine GPS status
+        gps_working = False
+        guide_status = "no_location"
+        location_info = "No location data"
+        
+        if latest_location:
+            # Compare datetime objects properly
+            time_diff = datetime.utcnow() - latest_location.updated_at
+            gps_working = time_diff.total_seconds() < 600  # 10 minutes in seconds
+            guide_status = "gps_active" if gps_working else "last_known"
+            location_info = "GPS Active" if gps_working else "Last Known Location"
+            
+            active_guides.append({
+                "id": guide_user.id,
+                "name": guide_user.full_name,
+                "email": guide_user.email,
+                "last_lat": latest_location.latitude,
+                "last_lon": latest_location.longitude,
+                "updated_at": latest_location.updated_at.isoformat(),
+                "assigned_tourist_count": assigned_count,
+                "status": guide_status,
+                "location_info": location_info,
+                "gps_working": gps_working
+            })
+        else:
+            # Guide has no location data
+            active_guides.append({
+                "id": guide_user.id,
+                "name": guide_user.full_name,
+                "email": guide_user.email,
+                "last_lat": None,
+                "last_lon": None,
+                "updated_at": None,
+                "assigned_tourist_count": assigned_count,
+                "status": guide_status,
+                "location_info": location_info,
+                "gps_working": gps_working
+            })
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 

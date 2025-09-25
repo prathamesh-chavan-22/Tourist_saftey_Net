@@ -105,7 +105,8 @@
             name: "{{ tourist.name }}",
             lat: {{ tourist.last_lat }},
             lon: {{ tourist.last_lon }},
-            status: "{{ tourist.status }}"
+            status: "{{ tourist.status }}",
+            trip_id: {{ trip.id }}
         };
         
         const geofenceData = {

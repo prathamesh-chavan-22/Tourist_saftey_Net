@@ -253,6 +253,72 @@
                             </div>
                         </div>
                         
+                        <!-- Guide Information Section -->
+                        {% if assigned_guide %}
+                        <div class="pt-4 border-t border-gray-200">
+                            <h4 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                <i class="fas fa-route text-orange-600"></i>
+                                Your Assigned Guide
+                            </h4>
+                            <div class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 space-y-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="flex-shrink-0 h-12 w-12">
+                                        <div class="h-12 w-12 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center">
+                                            <i class="fas fa-route text-white"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="font-semibold text-gray-900">{{ assigned_guide.name }}</div>
+                                        <div class="text-sm text-gray-600">{{ assigned_guide.email }}</div>
+                                        <div class="text-sm text-gray-600">{{ assigned_guide.contact_number }}</div>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        {% if assigned_guide.status == 'gps_active' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-satellite-dish mr-1"></i>
+                                            GPS Active
+                                        </span>
+                                        {% elif assigned_guide.status == 'last_known' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            <i class="fas fa-map-marker-alt mr-1"></i>
+                                            Last Known Location
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                                            No Location Data
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if assigned_guide.last_lat and assigned_guide.last_lon %}
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <span class="text-gray-600 font-medium">Location:</span>
+                                        <span class="text-gray-900 font-mono">{{ "%.4f"|format(assigned_guide.last_lat) }}, {{ "%.4f"|format(assigned_guide.last_lon) }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600 font-medium">Last Update:</span>
+                                        <span class="text-gray-900">
+                                            {% if assigned_guide.updated_at %}
+                                            {{ assigned_guide.updated_at[:19] | replace('T', ' ') }}
+                                            {% else %}
+                                            Never
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="text-center text-gray-600 text-sm">
+                                    <i class="fas fa-map-marker-slash mr-1"></i>
+                                    Your guide hasn't shared their location yet
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <div class="pt-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
                             <a href="/trip/{{ active_trip.id }}" 
                                class="flex-1 bg-brand-blue hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200 text-center flex items-center justify-center gap-2">

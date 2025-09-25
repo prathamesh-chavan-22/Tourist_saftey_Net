@@ -196,6 +196,47 @@ async def get_map_data(
     user_result = await db.execute(select(User).filter(User.id == trip.user_id))
     user = user_result.scalar_one_or_none()
     
+    # Get guide information if assigned
+    assigned_guide = None
+    if trip.guide_id:
+        # Fetch guide user info
+        guide_result = await db.execute(select(User).filter(User.id == trip.guide_id))
+        guide_user = guide_result.scalar_one_or_none()
+        
+        if guide_user:
+            # Get guide's latest location
+            from models import GuideLocation
+            from sqlalchemy import desc
+            guide_location_result = await db.execute(
+                select(GuideLocation)
+                .filter(GuideLocation.guide_id == guide_user.id)
+                .order_by(desc(GuideLocation.updated_at))
+                .limit(1)
+            )
+            guide_location = guide_location_result.scalar_one_or_none()
+            
+            # Determine guide GPS status
+            from datetime import datetime, timedelta
+            guide_gps_working = False
+            guide_status = "no_location"
+            
+            if guide_location:
+                time_diff = datetime.utcnow() - guide_location.updated_at
+                guide_gps_working = time_diff.total_seconds() < 600  # 10 minutes
+                guide_status = "gps_active" if guide_gps_working else "last_known"
+            
+            assigned_guide = {
+                "id": guide_user.id,
+                "name": guide_user.full_name,
+                "email": guide_user.email,
+                "contact_number": guide_user.contact_number,
+                "last_lat": guide_location.latitude if guide_location else None,
+                "last_lon": guide_location.longitude if guide_location else None,
+                "updated_at": guide_location.updated_at.isoformat() if guide_location else None,
+                "gps_working": guide_gps_working,
+                "status": guide_status
+            }
+    
     return {
         "trip": {
             "id": trip.id,
@@ -209,6 +250,7 @@ async def get_map_data(
             "hotels": trip.hotels,
             "mode_of_travel": trip.mode_of_travel
         },
+        "guide": assigned_guide,
         "geofence": {
             "center_lat": tourist_place["lat"],
             "center_lon": tourist_place["lon"],

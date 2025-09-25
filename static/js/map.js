@@ -159,7 +159,7 @@ async function updateLocation() {
     }
     
     try {
-        const response = await fetch('/update_location', {
+        const response = await fetch('/tourist/update_location', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -167,7 +167,8 @@ async function updateLocation() {
             body: JSON.stringify({
                 tourist_id: tourist.id,
                 latitude: currentLat,
-                longitude: currentLon
+                longitude: currentLon,
+                trip_id: tourist.trip_id
             })
         });
         
