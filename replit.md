@@ -6,6 +6,14 @@ The system uses a simple rule-based AI approach where tourists are classified as
 
 ## Recent Changes
 
+**September 25, 2025** - Tourist Dashboard Map Enhancement & UI Fixes:
+- **Guide Markers on Tourist Maps**: Implemented visual guide markers on tourist dashboard maps, displaying guides as distinctive orange markers with route icons instead of just numeric coordinates
+- **Real-time Guide Updates**: Enhanced WebSocket handling to support dynamic guide marker creation and updates, ensuring guides appear on maps even when starting without initial coordinates
+- **Smart Map View Management**: Added automatic map view adjustment to keep both tourist and guide markers visible, with intelligent zoom/pan when markers are far apart
+- **Rich Guide Information**: Guide markers display detailed popups with name, contact, GPS status, and last update timestamp with color-coded status indicators
+- **Header Z-Index Fix**: Fixed critical UI issue where map objects were overlapping sticky headers during scrolling by increasing header z-index from 50 to 9999 across all dashboards
+- **Guide Status Layout Fix**: Resolved guide status text overflow issue by moving status badges from cramped horizontal layout to below contact information for better readability
+
 **September 24, 2025** - Comprehensive Location Tracking System Implementation:
 - **Guide GPS Controls**: Implemented complete GPS tracking controls for guide dashboard with enable/disable toggle, status indicators with visual feedback, and manual location update functionality
 - **Guide Location Display**: Enhanced guide dashboard to prominently display guide's own current location with real-time coordinates (6-decimal precision), accuracy information, and custom red "G" markers on maps

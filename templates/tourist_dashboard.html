@@ -75,7 +75,7 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans">
     <!-- Header -->
-    <header class="bg-gradient-to-r from-brand-blue to-blue-600 shadow-lg sticky top-0 z-50">
+    <header class="bg-gradient-to-r from-brand-blue to-blue-600 shadow-lg sticky top-0 z-[9999]">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4 md:py-6">
                 <div class="flex-1">
@@ -261,7 +261,7 @@
                                 Your Assigned Guide
                             </h4>
                             <div class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 space-y-3">
-                                <div class="flex items-center space-x-3">
+                                <div class="flex items-start space-x-3">
                                     <div class="flex-shrink-0 h-12 w-12">
                                         <div class="h-12 w-12 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center">
                                             <i class="fas fa-route text-white"></i>
@@ -270,25 +270,25 @@
                                     <div class="flex-1">
                                         <div class="font-semibold text-gray-900">{{ assigned_guide.name }}</div>
                                         <div class="text-sm text-gray-600">{{ assigned_guide.email }}</div>
-                                        <div class="text-sm text-gray-600">{{ assigned_guide.contact_number }}</div>
-                                    </div>
-                                    <div class="flex-shrink-0">
-                                        {% if assigned_guide.status == 'gps_active' %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <i class="fas fa-satellite-dish mr-1"></i>
-                                            GPS Active
-                                        </span>
-                                        {% elif assigned_guide.status == 'last_known' %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                            <i class="fas fa-map-marker-alt mr-1"></i>
-                                            Last Known Location
-                                        </span>
-                                        {% else %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                                            No Location Data
-                                        </span>
-                                        {% endif %}
+                                        <div class="text-sm text-gray-600 mb-2">{{ assigned_guide.contact_number }}</div>
+                                        <div>
+                                            {% if assigned_guide.status == 'gps_active' %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                <i class="fas fa-satellite-dish mr-1"></i>
+                                                GPS Active
+                                            </span>
+                                            {% elif assigned_guide.status == 'last_known' %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                <i class="fas fa-map-marker-alt mr-1"></i>
+                                                Last Known Location
+                                            </span>
+                                            {% else %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                                No Location Data
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -603,6 +603,68 @@
             .addTo(map)
             .bindPopup('<b>Your Current Location</b><br>Status: {{ active_trip.status }}')
             .openPopup();
+
+        // Guide marker variable (will be created when guide location is available)
+        let guideMarker = null;
+        
+        // Function to create custom guide icon
+        function createGuideIcon() {
+            return L.divIcon({
+                html: '<div style="background: #FF6B35; width: 25px; height: 25px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><i class="fas fa-route"></i></div>',
+                className: 'custom-guide-icon',
+                iconSize: [31, 31],
+                iconAnchor: [15, 15]
+            });
+        }
+        
+        // Function to create or update guide marker
+        function createOrUpdateGuideMarker(lat, lon, guideName, guideEmail, status, updatedAt) {
+            const statusColor = (status === 'gps_active') ? '#28a745' : ((status === 'last_known') ? '#ffc107' : '#6c757d');
+            const statusText = (status === 'gps_active') ? 
+                '<i class="fas fa-satellite-dish"></i> GPS Active' : 
+                ((status === 'last_known') ? '<i class="fas fa-map-marker-alt"></i> Last Known' : '<i class="fas fa-exclamation-triangle"></i> No GPS');
+            
+            const popupContent = `
+                <div style="text-align: center;">
+                    <b style="color: #FF6B35;"><i class="fas fa-route"></i> Your Guide</b><br>
+                    <strong>${guideName}</strong><br>
+                    <small style="color: #666;">${guideEmail}</small><br>
+                    <span style="background: ${statusColor}; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">
+                        ${statusText}
+                    </span><br>
+                    <small style="color: #888;">
+                        Updated: ${updatedAt}
+                    </small>
+                </div>
+            `;
+            
+            if (guideMarker) {
+                // Update existing marker
+                guideMarker.setLatLng([lat, lon]);
+                guideMarker.setPopupContent(popupContent);
+            } else {
+                // Create new marker
+                guideMarker = L.marker([lat, lon], {
+                    icon: createGuideIcon()
+                }).addTo(map).bindPopup(popupContent);
+            }
+            
+            // Adjust map view to include both markers
+            const group = new L.featureGroup([marker, guideMarker]);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+
+        // Add guide marker if guide location is available at load time
+        {% if assigned_guide and assigned_guide.last_lat and assigned_guide.last_lon %}
+        createOrUpdateGuideMarker(
+            {{ assigned_guide.last_lat }}, 
+            {{ assigned_guide.last_lon }}, 
+            "{{ assigned_guide.name }}", 
+            "{{ assigned_guide.email }}", 
+            "{{ assigned_guide.status }}", 
+            "{% if assigned_guide.updated_at %}{{ assigned_guide.updated_at[:19] | replace('T', ' ') }}{% else %}Never updated{% endif %}"
+        );
+        {% endif %}
         
         // WebSocket for real-time updates
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -641,6 +703,26 @@
                     }
                 });
             }
+            
+            // Handle guide location updates
+            {% if assigned_guide %}
+            if (data.type === 'guide_location_update' && data.guide_id === {{ assigned_guide.id }}) {
+                // Create or update guide marker using the unified function
+                const status = data.gps_active ? 'gps_active' : (data.last_known ? 'last_known' : 'no_location');
+                const updatedTime = new Date(data.timestamp).toLocaleString();
+                
+                createOrUpdateGuideMarker(
+                    data.latitude, 
+                    data.longitude, 
+                    "{{ assigned_guide.name }}", 
+                    "{{ assigned_guide.email }}", 
+                    status, 
+                    updatedTime
+                );
+                
+                console.log('Guide location updated:', data.latitude, data.longitude);
+            }
+            {% endif %}
         };
         
         ws.onerror = function(error) {
