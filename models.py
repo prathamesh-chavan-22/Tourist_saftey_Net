@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 Base = declarative_base()
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 class User(Base):
     __tablename__ = "users"
